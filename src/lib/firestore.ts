@@ -181,10 +181,17 @@ export const getRoleVerifications = (
   if (role === 'lender') collectionName = 'lender_verifications';
   if (role === 'worker') collectionName = 'crew_verifications';
 
-  const q = query(
-    collection(db, collectionName),
-    where('status', '==', status)
-  );
+  // For role_verifications collection (filmmaker/influencer), also filter by role
+  const q = collectionName === 'role_verifications'
+    ? query(
+        collection(db, collectionName),
+        where('status', '==', status),
+        where('role', '==', role)
+      )
+    : query(
+        collection(db, collectionName),
+        where('status', '==', status)
+      );
 
   return onSnapshot(q, (snapshot) => {
     const requests = snapshot.docs.map((docSnap) => {
