@@ -33,16 +33,37 @@ export default function NotificationsPage() {
 
   const loadHistory = async () => {
     try {
-      const q = query(
-        collection(db, 'push_notifications'),
-        orderBy('sentAt', 'desc'),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
+      // Try with ordering first
+      let snapshot;
+      try {
+        const q = query(
+          collection(db, 'push_notifications'),
+          orderBy('sentAt', 'desc'),
+          limit(20)
+        );
+        snapshot = await getDocs(q);
+      } catch (indexError) {
+        // Fallback without ordering if index not ready
+        console.log('Index not ready, fetching without order');
+        const q = query(
+          collection(db, 'push_notifications'),
+          limit(20)
+        );
+        snapshot = await getDocs(q);
+      }
+      
       const notifications = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       })) as NotificationHistory[];
+      
+      // Sort in memory if needed
+      notifications.sort((a, b) => {
+        const aTime = a.sentAt?.toDate?.() || new Date(0);
+        const bTime = b.sentAt?.toDate?.() || new Date(0);
+        return bTime.getTime() - aTime.getTime();
+      });
+      
       setHistory(notifications);
     } catch (error) {
       console.error('Error loading notification history:', error);
