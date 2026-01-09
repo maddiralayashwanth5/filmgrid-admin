@@ -556,3 +556,53 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     },
   };
 };
+
+// ==================== HERO BANNERS ====================
+
+export interface HeroBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  linkUrl?: string;
+  isActive: boolean;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const getHeroBanners = async (): Promise<HeroBanner[]> => {
+  const q = query(collection(db, 'hero_banners'), orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    title: doc.data().title || '',
+    subtitle: doc.data().subtitle || '',
+    imageUrl: doc.data().imageUrl || '',
+    linkUrl: doc.data().linkUrl || '',
+    isActive: doc.data().isActive ?? true,
+    order: doc.data().order || 0,
+    createdAt: toDate(doc.data().createdAt),
+    updatedAt: toDate(doc.data().updatedAt),
+  }));
+};
+
+export const createHeroBanner = async (banner: Omit<HeroBanner, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const docRef = await addDoc(collection(db, 'hero_banners'), {
+    ...banner,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateHeroBanner = async (id: string, data: Partial<HeroBanner>) => {
+  await updateDoc(doc(db, 'hero_banners', id), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteHeroBanner = async (id: string) => {
+  await deleteDoc(doc(db, 'hero_banners', id));
+};
