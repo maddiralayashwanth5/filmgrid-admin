@@ -15,7 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getUsers, updateUserRole, toggleUserBan, deleteUser } from '@/lib/firestore';
+import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification } from '@/lib/firestore';
 import type { User, ContactInfo } from '@/lib/types';
 
 export default function UsersPage() {
@@ -28,6 +28,8 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'pending' | 'verified'>('all');
+  const [showResetAllModal, setShowResetAllModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const pageSize = 15;
 
   useEffect(() => {
@@ -64,6 +66,28 @@ export default function UsersPage() {
     } catch (error) {
       console.error('Error deleting user:', error);
     }
+  };
+
+  const handleResetVerification = async (userId: string) => {
+    try {
+      await resetUserVerification(userId);
+      setShowMenu(null);
+    } catch (error) {
+      console.error('Error resetting verification:', error);
+    }
+  };
+
+  const handleResetAllVerifications = async () => {
+    setResetting(true);
+    try {
+      const count = await resetAllUsersVerification();
+      alert(`Successfully reset verification for ${count} users`);
+      setShowResetAllModal(false);
+    } catch (error) {
+      console.error('Error resetting all verifications:', error);
+      alert('Failed to reset verifications');
+    }
+    setResetting(false);
   };
 
   const getRoleBadge = (role: string | undefined) => {
@@ -178,12 +202,12 @@ export default function UsersPage() {
             <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-xl">
               <p className="border-b px-4 py-2 text-xs font-medium text-gray-500">Change Role</p>
               <button
-                onClick={() => handleRoleChange(user.uid, 'renter')}
+                onClick={() => handleRoleChange(user.uid, 'user')}
                 className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                  user.role === 'renter' ? 'bg-blue-50 text-blue-600' : ''
+                  user.role === 'user' || user.role === 'renter' ? 'bg-blue-50 text-blue-600' : ''
                 }`}
               >
-                Renter
+                Filmmaker
               </button>
               <button
                 onClick={() => handleRoleChange(user.uid, 'lender')}
@@ -192,6 +216,22 @@ export default function UsersPage() {
                 }`}
               >
                 Lender
+              </button>
+              <button
+                onClick={() => handleRoleChange(user.uid, 'worker')}
+                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                  user.role === 'worker' ? 'bg-blue-50 text-blue-600' : ''
+                }`}
+              >
+                Crew
+              </button>
+              <button
+                onClick={() => handleRoleChange(user.uid, 'influencer')}
+                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                  user.role === 'influencer' ? 'bg-blue-50 text-blue-600' : ''
+                }`}
+              >
+                Influencer
               </button>
               <div className="border-t">
                 <button
@@ -230,6 +270,13 @@ export default function UsersPage() {
                     Delete User
                   </button>
                 )}
+                <button
+                  onClick={() => handleResetVerification(user.uid)}
+                  className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50"
+                >
+                  <Shield className="h-4 w-4" />
+                  Reset Verification
+                </button>
               </div>
             </div>
           )}
@@ -281,9 +328,17 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600">Manage all users on the platform</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage all users on the platform</p>
+        </div>
+        <button
+          onClick={() => setShowResetAllModal(true)}
+          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+        >
+          Reset All Verifications
+        </button>
       </div>
 
       {/* Filters */}
@@ -617,6 +672,38 @@ export default function UsersPage() {
                 className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium hover:bg-gray-200"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset All Verifications Modal */}
+      {showResetAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6">
+            <h3 className="mb-4 text-lg font-semibold text-red-600">Reset All Verifications</h3>
+            <p className="mb-4 text-gray-600">
+              This will reset the verification status for <strong>ALL users</strong> to &quot;Not Verified&quot;. 
+              This action cannot be undone.
+            </p>
+            <p className="mb-4 text-sm text-gray-500">
+              All role-specific verifications (Filmmaker, Lender, Crew, Influencer) will also be reset.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResetAllModal(false)}
+                disabled={resetting}
+                className="flex-1 rounded-lg border py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetAllVerifications}
+                disabled={resetting}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {resetting ? 'Resetting...' : 'Reset All'}
               </button>
             </div>
           </div>

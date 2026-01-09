@@ -323,6 +323,48 @@ export const deleteUser = async (userId: string) => {
   await deleteDoc(doc(db, 'users', userId));
 };
 
+export const resetUserVerification = async (userId: string) => {
+  await updateDoc(doc(db, 'users', userId), {
+    role: 'user',
+    verificationStatus: 'notVerified',
+    idDocumentUrl: null,
+    verifiedAt: null,
+    verifiedBy: null,
+    verificationNotes: null,
+    filmmakerVerification: { status: 'notVerified' },
+    lenderVerification: { status: 'notVerified' },
+    workerVerification: { status: 'notVerified' },
+    influencerVerification: { status: 'notVerified' },
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const resetAllUsersVerification = async () => {
+  const usersSnapshot = await getDocs(collection(db, 'users'));
+  const batch: Promise<void>[] = [];
+  
+  usersSnapshot.docs.forEach((userDoc) => {
+    batch.push(
+      updateDoc(doc(db, 'users', userDoc.id), {
+        role: 'user',
+        verificationStatus: 'notVerified',
+        idDocumentUrl: null,
+        verifiedAt: null,
+        verifiedBy: null,
+        verificationNotes: null,
+        filmmakerVerification: { status: 'notVerified' },
+        lenderVerification: { status: 'notVerified' },
+        workerVerification: { status: 'notVerified' },
+        influencerVerification: { status: 'notVerified' },
+        updatedAt: Timestamp.now(),
+      })
+    );
+  });
+  
+  await Promise.all(batch);
+  return usersSnapshot.docs.length;
+};
+
 // ==================== EQUIPMENT ====================
 
 export const getEquipment = (callback: (equipment: Equipment[]) => void) => {
