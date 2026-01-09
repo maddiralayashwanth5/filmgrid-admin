@@ -20,6 +20,7 @@ import {
   History,
   Trophy,
   Image,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -39,6 +40,7 @@ const navItems = [
   { href: '/dashboard/promotions', label: 'Video Promotions', icon: Video },
   { href: '/dashboard/workforce', label: 'Workforce', icon: Users },
   { href: '/dashboard/marketing', label: 'Marketing', icon: Mail },
+  { href: '/dashboard/notifications', label: 'Push Notifications', icon: Bell },
   { href: '/dashboard/logs', label: 'Audit Logs', icon: History },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
