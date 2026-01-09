@@ -144,6 +144,174 @@ export const verifyUserProfile = async (
   });
 };
 
+// ==================== ROLE-SPECIFIC VERIFICATIONS ====================
+
+export type RoleVerificationType = 'filmmaker' | 'lender' | 'worker' | 'influencer';
+
+export interface RoleVerificationRequest {
+  id: string;
+  userId: string;
+  displayName: string;
+  phone: string;
+  role: RoleVerificationType;
+  documentUrl: string;
+  status: 'pending' | 'verified' | 'rejected';
+  submittedAt: Date;
+  // Lender specific
+  cameraBrand?: string;
+  cameraModel?: string;
+  cameraSerialNumber?: string;
+  cameraPhotoUrl?: string;
+  // Worker specific
+  category?: string;
+  experienceYears?: number;
+  isUnionMember?: boolean;
+  unionName?: string;
+  unionId?: string;
+  unionCardUrl?: string;
+  bio?: string;
+}
+
+export const getRoleVerifications = (
+  role: RoleVerificationType,
+  status: 'pending' | 'verified' | 'rejected',
+  callback: (requests: RoleVerificationRequest[]) => void
+) => {
+  let collectionName = 'role_verifications';
+  if (role === 'lender') collectionName = 'lender_verifications';
+  if (role === 'worker') collectionName = 'crew_verifications';
+
+  const q = query(
+    collection(db, collectionName),
+    where('status', '==', status)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const requests = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        userId: data.userId,
+        displayName: data.displayName || '',
+        phone: data.phone || '',
+        role: role,
+        documentUrl: data.documentUrl || data.idDocumentUrl || '',
+        status: data.status,
+        submittedAt: toDate(data.submittedAt as Timestamp),
+        // Lender specific
+        cameraBrand: data.cameraBrand,
+        cameraModel: data.cameraModel,
+        cameraSerialNumber: data.cameraSerialNumber,
+        cameraPhotoUrl: data.cameraPhotoUrl,
+        // Worker specific
+        category: data.category,
+        experienceYears: data.experienceYears,
+        isUnionMember: data.isUnionMember,
+        unionName: data.unionName,
+        unionId: data.unionId,
+        unionCardUrl: data.unionCardUrl,
+        bio: data.bio,
+      } as RoleVerificationRequest;
+    });
+    requests.sort((a, b) => (b.submittedAt?.getTime() || 0) - (a.submittedAt?.getTime() || 0));
+    callback(requests);
+  }, (error) => {
+    console.error(`Error fetching ${role} verifications:`, error);
+    callback([]);
+  });
+};
+
+export const approveRoleVerification = async (
+  request: RoleVerificationRequest,
+  adminId: string
+) => {
+  let collectionName = 'role_verifications';
+  if (request.role === 'lender') collectionName = 'lender_verifications';
+  if (request.role === 'worker') collectionName = 'crew_verifications';
+
+  // Update verification request status
+  await updateDoc(doc(db, collectionName, request.id), {
+    status: 'verified',
+    verifiedAt: Timestamp.now(),
+    verifiedBy: adminId,
+  });
+
+  // Update user's role-specific verification field
+  const verificationField = `${request.role === 'worker' ? 'worker' : request.role}Verification`;
+  await updateDoc(doc(db, 'users', request.userId), {
+    [verificationField]: {
+      status: 'verified',
+      documentUrl: request.documentUrl,
+      verifiedAt: Timestamp.now(),
+    },
+    updatedAt: Timestamp.now(),
+  });
+
+  // Send notification
+  const roleNames: Record<string, string> = {
+    filmmaker: 'Filmmaker',
+    lender: 'Lender',
+    worker: 'Crew',
+    influencer: 'Influencer',
+  };
+
+  await addDoc(collection(db, 'notifications'), {
+    userId: request.userId,
+    type: 'roleVerified',
+    title: `${roleNames[request.role]} Verification Approved! 🎉`,
+    body: `Your ${roleNames[request.role]} verification has been approved.`,
+    data: { verificationType: request.role },
+    isRead: false,
+    createdAt: Timestamp.now(),
+  });
+};
+
+export const rejectRoleVerification = async (
+  request: RoleVerificationRequest,
+  adminId: string,
+  notes: string
+) => {
+  let collectionName = 'role_verifications';
+  if (request.role === 'lender') collectionName = 'lender_verifications';
+  if (request.role === 'worker') collectionName = 'crew_verifications';
+
+  // Update verification request status
+  await updateDoc(doc(db, collectionName, request.id), {
+    status: 'rejected',
+    rejectedAt: Timestamp.now(),
+    rejectedBy: adminId,
+    rejectionNotes: notes,
+  });
+
+  // Update user's role-specific verification field
+  const verificationField = `${request.role === 'worker' ? 'worker' : request.role}Verification`;
+  await updateDoc(doc(db, 'users', request.userId), {
+    [verificationField]: {
+      status: 'notVerified',
+      rejectionNotes: notes,
+    },
+    updatedAt: Timestamp.now(),
+  });
+
+  // Send notification
+  const roleNames: Record<string, string> = {
+    filmmaker: 'Filmmaker',
+    lender: 'Lender',
+    worker: 'Crew',
+    influencer: 'Influencer',
+  };
+
+  await addDoc(collection(db, 'notifications'), {
+    userId: request.userId,
+    type: 'roleRejected',
+    title: `${roleNames[request.role]} Verification Not Approved`,
+    body: `Your ${roleNames[request.role]} verification was not approved. ${notes}`,
+    data: { verificationType: request.role },
+    isRead: false,
+    createdAt: Timestamp.now(),
+  });
+};
+
 export const toggleUserBan = async (userId: string, isBanned: boolean) => {
   await updateDoc(doc(db, 'users', userId), {
     isBanned,
