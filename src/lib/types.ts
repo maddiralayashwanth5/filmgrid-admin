@@ -1,5 +1,5 @@
 // User types
-export type UserRole = 'renter' | 'lender';
+export type UserRole = 'renter' | 'lender' | 'worker' | 'influencer' | 'user';
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'notVerified';
 
 export interface ContactInfo {
@@ -118,5 +118,8 @@ export interface DashboardStats {
   usersByRole: {
     renters: number;
     lenders: number;
+    workers: number;
+    influencers: number;
+    users: number;
   };
 }

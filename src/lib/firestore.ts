@@ -523,6 +523,9 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     completedBookingsSnapshot,
     rentersSnapshot,
     lendersSnapshot,
+    workersSnapshot,
+    influencersSnapshot,
+    defaultUsersSnapshot,
   ] = await Promise.all([
     getCountFromServer(collection(db, 'users')),
     getCountFromServer(collection(db, 'equipment')),
@@ -534,6 +537,9 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     getDocs(query(collection(db, 'bookings'), where('status', '==', 'completed'))),
     getCountFromServer(query(collection(db, 'users'), where('role', '==', 'renter'))),
     getCountFromServer(query(collection(db, 'users'), where('role', '==', 'lender'))),
+    getCountFromServer(query(collection(db, 'users'), where('role', '==', 'worker'))),
+    getCountFromServer(query(collection(db, 'users'), where('role', '==', 'influencer'))),
+    getCountFromServer(query(collection(db, 'users'), where('role', '==', 'user'))),
   ]);
 
   let totalRevenue = 0;
@@ -553,6 +559,9 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     usersByRole: {
       renters: rentersSnapshot.data().count,
       lenders: lendersSnapshot.data().count,
+      workers: workersSnapshot.data().count,
+      influencers: influencersSnapshot.data().count,
+      users: defaultUsersSnapshot.data().count,
     },
   };
 };
