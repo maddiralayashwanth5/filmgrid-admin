@@ -57,6 +57,7 @@ export default function RequestsPage() {
   const [rentalRequests, setRentalRequests] = useState<BroadcastRequest[]>([]);
   const [workforceRequests, setWorkforceRequests] = useState<BroadcastRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'gear' | 'rental' | 'workforce'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -92,6 +93,10 @@ export default function RequestsPage() {
         dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setGearRequests(data);
+      console.log('Gear requests loaded:', data.length);
+    }, (err) => {
+      console.error('Error loading gear requests:', err);
+      setError(`Gear: ${err.message}`);
     });
 
     // Rental requests
@@ -120,6 +125,10 @@ export default function RequestsPage() {
         dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setRentalRequests(data);
+      console.log('Rental requests loaded:', data.length);
+    }, (err) => {
+      console.error('Error loading rental requests:', err);
+      setError(`Rental: ${err.message}`);
     });
 
     // Workforce requests
@@ -148,6 +157,11 @@ export default function RequestsPage() {
         dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setWorkforceRequests(data);
+      setLoading(false);
+      console.log('Workforce requests loaded:', data.length);
+    }, (err) => {
+      console.error('Error loading workforce requests:', err);
+      setError(`Workforce: ${err.message}`);
       setLoading(false);
     });
 
@@ -282,6 +296,14 @@ export default function RequestsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Broadcast Requests</h1>
         <p className="text-gray-600">Monitor all quick-match broadcast requests</p>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">
+          <p className="font-medium">Error loading requests:</p>
+          <p className="text-sm">{error}</p>
+          <p className="mt-2 text-xs">Check browser console for details. Make sure Firestore rules are deployed.</p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-5 gap-4">

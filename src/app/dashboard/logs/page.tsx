@@ -47,6 +47,7 @@ interface AdminLog {
 export default function LogsPage() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,6 +66,11 @@ export default function LogsPage() {
         timestamp: doc.data().timestamp?.toDate() || new Date(),
       })) as AdminLog[];
       setLogs(data);
+      setLoading(false);
+      console.log('Admin logs loaded:', data.length);
+    }, (err) => {
+      console.error('Error loading admin logs:', err);
+      setError(err.message);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -139,6 +145,14 @@ export default function LogsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Admin Audit Logs</h1>
         <p className="text-gray-600">Track all administrative actions for compliance</p>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">
+          <p className="font-medium">Error loading logs:</p>
+          <p className="text-sm">{error}</p>
+          <p className="mt-2 text-xs">Check browser console for details. Make sure Firestore rules are deployed.</p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-5 gap-4">
