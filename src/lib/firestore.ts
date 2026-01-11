@@ -896,7 +896,7 @@ export interface EquipmentCatalogItem {
 
 // Get all catalog items
 export const getEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) => void) => {
-  const q = query(collection(db, 'equipment_catalog'), orderBy('category'), orderBy('brand'), orderBy('name'));
+  const q = query(collection(db, 'equipment_catalog'));
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -904,6 +904,12 @@ export const getEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) =>
       createdAt: toDate(doc.data().createdAt),
       updatedAt: toDate(doc.data().updatedAt),
     })) as EquipmentCatalogItem[];
+    // Sort client-side to avoid composite index requirement
+    items.sort((a, b) => {
+      if (a.category !== b.category) return a.category.localeCompare(b.category);
+      if (a.brand !== b.brand) return a.brand.localeCompare(b.brand);
+      return a.name.localeCompare(b.name);
+    });
     callback(items);
   }, (error) => {
     console.error('Error fetching equipment catalog:', error);
@@ -915,9 +921,7 @@ export const getEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) =>
 export const getActiveEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) => void) => {
   const q = query(
     collection(db, 'equipment_catalog'),
-    where('isActive', '==', true),
-    orderBy('category'),
-    orderBy('name')
+    where('isActive', '==', true)
   );
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((doc) => ({
@@ -926,6 +930,11 @@ export const getActiveEquipmentCatalog = (callback: (items: EquipmentCatalogItem
       createdAt: toDate(doc.data().createdAt),
       updatedAt: toDate(doc.data().updatedAt),
     })) as EquipmentCatalogItem[];
+    // Sort client-side
+    items.sort((a, b) => {
+      if (a.category !== b.category) return a.category.localeCompare(b.category);
+      return a.name.localeCompare(b.name);
+    });
     callback(items);
   }, (error) => {
     console.error('Error fetching active equipment catalog:', error);
