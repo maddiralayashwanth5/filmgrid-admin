@@ -19,6 +19,7 @@ import {
   Plus,
   Upload,
   Loader2,
+  Users,
 } from 'lucide-react';
 import {
   getEquipment,
@@ -94,6 +95,11 @@ export default function EquipmentPage() {
   const [newCategory, setNewCategory] = useState('');
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Owners modal state
+  const [showOwnersModal, setShowOwnersModal] = useState(false);
+  const [selectedProductOwners, setSelectedProductOwners] = useState<Equipment[]>([]);
+  const [selectedProductName, setSelectedProductName] = useState('');
 
   // Subscribe to both all equipment and pending equipment for counts
   useEffect(() => {
@@ -329,7 +335,12 @@ export default function EquipmentPage() {
     }
   }, [categories, initialExpanded]);
 
-  // Group equipment by category -> brand
+  // Normalize title to merge similar product names
+  const normalizeTitle = (title: string | undefined): string => {
+    return (title?.trim() || 'Unknown').toLowerCase();
+  };
+
+  // Group equipment by category -> brand -> product name (consolidated)
   const groupedEquipment = useMemo(() => {
     const filtered = searchQuery
       ? equipment.filter(e => 
@@ -339,19 +350,23 @@ export default function EquipmentPage() {
         )
       : equipment;
 
-    const grouped: Record<string, Record<string, Equipment[]>> = {};
+    const grouped: Record<string, Record<string, Record<string, Equipment[]>>> = {};
 
     filtered.forEach(item => {
       const category = normalizeCategory(item.category);
       const brand = normalizeBrand(item.brand);
+      const titleKey = normalizeTitle(item.title);
       
       if (!grouped[category]) {
         grouped[category] = {};
       }
       if (!grouped[category][brand]) {
-        grouped[category][brand] = [];
+        grouped[category][brand] = {};
       }
-      grouped[category][brand].push(item);
+      if (!grouped[category][brand][titleKey]) {
+        grouped[category][brand][titleKey] = [];
+      }
+      grouped[category][brand][titleKey].push(item);
     });
 
     return grouped;
@@ -364,11 +379,37 @@ export default function EquipmentPage() {
     return Object.keys(brands).sort();
   };
 
+  // Get products for a brand
+  const getProductsForBrand = (category: string, brand: string): { title: string; items: Equipment[] }[] => {
+    const products = groupedEquipment[category]?.[brand];
+    if (!products) return [];
+    return Object.entries(products).map(([title, items]) => ({
+      title: items[0]?.title || title, // Use actual title from first item
+      items,
+    })).sort((a, b) => a.title.localeCompare(b.title));
+  };
+
   // Get item count for a category
   const getCategoryCount = (category: string): number => {
     const brands = groupedEquipment[category];
     if (!brands) return 0;
-    return Object.values(brands).reduce((sum, items) => sum + items.length, 0);
+    return Object.values(brands).reduce((sum, products) => {
+      return sum + Object.values(products).reduce((pSum, items) => pSum + items.length, 0);
+    }, 0);
+  };
+
+  // Get unique product count for a brand
+  const getBrandProductCount = (category: string, brand: string): number => {
+    const products = groupedEquipment[category]?.[brand];
+    if (!products) return 0;
+    return Object.keys(products).length;
+  };
+
+  // Open owners modal
+  const handleShowOwners = (productName: string, owners: Equipment[]) => {
+    setSelectedProductName(productName);
+    setSelectedProductOwners(owners);
+    setShowOwnersModal(true);
   };
 
   const toggleCategory = (category: string) => {
@@ -718,7 +759,8 @@ export default function EquipmentPage() {
                     {brands.map((brand) => {
                       const brandKey = `${category}:${brand}`;
                       const isBrandExpanded = expandedBrands.has(brandKey);
-                      const items = groupedEquipment[category]?.[brand] || [];
+                      const products = getProductsForBrand(category, brand);
+                      const productCount = getBrandProductCount(category, brand);
 
                       return (
                         <div key={brandKey} className="rounded-lg border bg-white">
@@ -735,24 +777,91 @@ export default function EquipmentPage() {
                               <span className="text-sm font-medium text-gray-700">{brand}</span>
                             </div>
                             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                              {items.length}
+                              {productCount} products
                             </span>
                           </button>
 
                           {isBrandExpanded && (
                             <div className="border-t px-3 pb-3 pt-2">
-                              {/* Header Row - matches content row layout */}
+                              {/* Header Row */}
                               <div className="mb-2 flex items-center gap-4 border-b pb-2 text-xs font-medium text-gray-400">
                                 <div className="w-14 shrink-0">Img</div>
-                                <div className="min-w-0 flex-1">Title</div>
-                                <div className="hidden w-28 shrink-0 md:block">Owner</div>
-                                <div className="w-20 shrink-0 text-right">Rate</div>
-                                <div className="hidden w-24 shrink-0 lg:block">City</div>
+                                <div className="min-w-0 flex-1">Product</div>
+                                <div className="w-24 shrink-0 text-center">Owners</div>
+                                <div className="w-24 shrink-0 text-right">Rate Range</div>
                                 <div className="w-28 shrink-0">Status</div>
-                                <div className="w-8 shrink-0 text-right">Actions</div>
                               </div>
                               <div className="space-y-1">
-                                {items.map(renderEquipmentCard)}
+                                {products.map(({ title, items }) => {
+                                  const firstItem = items[0];
+                                  const ownerCount = items.length;
+                                  const minRate = Math.min(...items.map(i => i.dailyRate || 0));
+                                  const maxRate = Math.max(...items.map(i => i.dailyRate || 0));
+                                  const activeCount = items.filter(i => i.isActive).length;
+                                  const verifiedCount = items.filter(i => i.isVerified).length;
+
+                                  return (
+                                    <div
+                                      key={title}
+                                      className="flex items-center gap-4 rounded-lg border bg-white p-3 hover:bg-gray-50 cursor-pointer"
+                                      onClick={() => handleShowOwners(title, items)}
+                                    >
+                                      {/* Image */}
+                                      <div className="w-14 shrink-0">
+                                        <div className="aspect-square w-14 overflow-hidden rounded-lg border">
+                                          {firstItem.photos?.[0] ? (
+                                            <img src={firstItem.photos[0]} alt="" className="h-full w-full object-cover" />
+                                          ) : (
+                                            <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                                              <Camera className="h-6 w-6 text-gray-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Title */}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-gray-900">{firstItem.title}</p>
+                                        <p className="text-xs text-gray-500">{brand}</p>
+                                      </div>
+
+                                      {/* Owners Count */}
+                                      <div className="w-24 shrink-0 text-center">
+                                        <button
+                                          className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-200"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleShowOwners(firstItem.title, items);
+                                          }}
+                                        >
+                                          <Users className="h-3 w-3" />
+                                          {ownerCount} {ownerCount === 1 ? 'owner' : 'owners'}
+                                        </button>
+                                      </div>
+
+                                      {/* Rate Range */}
+                                      <div className="w-24 shrink-0 text-right">
+                                        {minRate === maxRate ? (
+                                          <span className="text-sm font-semibold text-gray-900">₹{minRate}</span>
+                                        ) : (
+                                          <span className="text-sm font-semibold text-gray-900">₹{minRate} - ₹{maxRate}</span>
+                                        )}
+                                      </div>
+
+                                      {/* Status */}
+                                      <div className="w-28 shrink-0 flex items-center gap-2">
+                                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                          {activeCount} active
+                                        </span>
+                                        {verifiedCount > 0 && (
+                                          <span title={`${verifiedCount} verified`}>
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1088,6 +1197,138 @@ export default function EquipmentPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Owners Modal */}
+      {showOwnersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowOwnersModal(false)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-xl bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{selectedProductName}</h2>
+                <p className="text-sm text-gray-500">{selectedProductOwners.length} owner{selectedProductOwners.length !== 1 ? 's' : ''} listing this equipment</p>
+              </div>
+              <button
+                onClick={() => setShowOwnersModal(false)}
+                className="rounded-lg p-2 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Owners List */}
+            <div className="space-y-3">
+              {selectedProductOwners.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-4 rounded-lg border p-4 hover:bg-gray-50"
+                >
+                  {/* Image */}
+                  <div className="w-16 shrink-0">
+                    <div className="aspect-square w-16 overflow-hidden rounded-lg border">
+                      {item.photos?.[0] ? (
+                        <img src={item.photos[0]} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                          <Camera className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Owner Info */}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900">{item.ownerName || 'Unknown Owner'}</p>
+                    <p className="text-sm text-gray-500">{item.city || 'Location not specified'}</p>
+                  </div>
+
+                  {/* Rate */}
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-gray-900">₹{item.dailyRate || 0}</p>
+                    <p className="text-xs text-gray-500">per day</p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        item.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {item.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    {item.isVerified ? (
+                      <span className="flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle className="h-3 w-3" /> Verified
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-orange-500">
+                        <XCircle className="h-3 w-3" /> Pending
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMenu(showMenu === item.id ? null : item.id)}
+                      className="rounded p-1 hover:bg-gray-200"
+                    >
+                      <MoreVertical className="h-4 w-4 text-gray-500" />
+                    </button>
+                    {showMenu === item.id && (
+                      <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border bg-white py-1 shadow-xl">
+                        <button
+                          onClick={() => {
+                            handleEditEquipment(item);
+                            setShowOwnersModal(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-blue-600 hover:bg-blue-50"
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </button>
+                        {!item.isVerified ? (
+                          <button
+                            onClick={() => handleVerify(item.id, true)}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-green-600 hover:bg-green-50"
+                          >
+                            <CheckCircle className="h-3 w-3" /> Approve
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleVerify(item.id, false)}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-orange-600 hover:bg-orange-50"
+                          >
+                            <XCircle className="h-3 w-3" /> Revoke
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleToggleStatus(item.id, item.isActive)}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50"
+                        >
+                          {item.isActive ? <ToggleLeft className="h-3 w-3" /> : <ToggleRight className="h-3 w-3" />}
+                          {item.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
