@@ -456,10 +456,10 @@ export const getEquipment = (callback: (equipment: Equipment[]) => void) => {
 };
 
 export const getPendingEquipment = (callback: (equipment: Equipment[]) => void) => {
-  // Query for equipment with verificationStatus = 'pending'
+  // Query for equipment that is not verified yet
   const q = query(
     collection(db, 'equipment'),
-    where('verificationStatus', '==', 'pending')
+    where('isVerified', '==', false)
   );
   return onSnapshot(q, async (snapshot) => {
     const equipmentList = snapshot.docs.map((doc) => ({
