@@ -27,6 +27,7 @@ import {
   updateDoc,
   deleteDoc,
   Timestamp,
+  where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -83,12 +84,30 @@ export default function WorkforcePage() {
   const pageSize = 15;
 
   useEffect(() => {
-    // Worker profiles
-    const workersQuery = query(collection(db, 'worker_profiles'), orderBy('createdAt', 'desc'));
+    // Query users with verified worker role
+    const workersQuery = query(
+      collection(db, 'users'),
+      where('workerVerification.status', '==', 'verified')
+    );
     const unsubWorkers = onSnapshot(workersQuery, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(),
+        userId: doc.id,
+        name: doc.data().displayName || doc.data().name || 'Unknown',
+        phone: doc.data().phone || doc.data().phoneNumber || '',
+        category: doc.data().crewCategory || doc.data().workerCategory || 'General',
+        skills: doc.data().skills || [],
+        experience: doc.data().experience || 0,
+        hourlyRate: doc.data().hourlyRate,
+        dailyRate: doc.data().dailyRate,
+        location: doc.data().location || doc.data().city || '',
+        bio: doc.data().bio || '',
+        rating: doc.data().rating || 0,
+        totalRatings: doc.data().totalRatings || 0,
+        completedJobs: doc.data().completedJobs || 0,
+        isVerified: true,
+        isAvailable: doc.data().isAvailable !== false,
+        profileImageUrl: doc.data().profileImageUrl || doc.data().photoURL,
         createdAt: doc.data().createdAt?.toDate() || new Date(),
       })) as WorkerProfile[];
       setWorkers(data);

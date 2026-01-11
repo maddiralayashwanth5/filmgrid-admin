@@ -38,11 +38,18 @@ interface BroadcastRequest {
   location: string;
   startDate: Date;
   endDate?: Date;
-  status: 'searching' | 'accepted' | 'completed' | 'cancelled' | 'expired';
+  status: 'searching' | 'accepted' | 'active' | 'completed' | 'cancelled' | 'expired';
   timeoutAt?: Date;
   assignedId?: string;
   assignedName?: string;
   createdAt: Date;
+  // OTP verification fields
+  pickupOtp?: string;
+  dropOtp?: string;
+  pickupVerified?: boolean;
+  dropVerified?: boolean;
+  pickupVerifiedAt?: Date;
+  dropVerifiedAt?: Date;
 }
 
 export default function RequestsPage() {
@@ -65,18 +72,24 @@ export default function RequestsPage() {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         type: 'gear' as const,
-        userId: doc.data().userId,
-        userName: doc.data().userName,
-        category: doc.data().gearCategory,
+        userId: doc.data().requesterId || doc.data().userId,
+        userName: doc.data().requesterName || doc.data().userName || 'Unknown',
+        category: doc.data().title || doc.data().gearCategory || 'Gear Request',
         description: doc.data().description,
-        location: doc.data().location,
-        startDate: doc.data().startDate?.toDate() || new Date(),
-        endDate: doc.data().endDate?.toDate(),
+        location: doc.data().details?.location || doc.data().location || '',
+        startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
+        endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
-        timeoutAt: doc.data().timeoutAt?.toDate(),
-        assignedId: doc.data().assignedLenderId,
-        assignedName: doc.data().assignedLenderName,
+        timeoutAt: doc.data().expiresAt?.toDate() || doc.data().timeoutAt?.toDate(),
+        assignedId: doc.data().acceptedByLenderId || doc.data().assignedLenderId,
+        assignedName: doc.data().acceptedByLenderName || doc.data().assignedLenderName,
         createdAt: doc.data().createdAt?.toDate() || new Date(),
+        pickupOtp: doc.data().pickupOtp,
+        dropOtp: doc.data().dropOtp,
+        pickupVerified: doc.data().pickupVerified || false,
+        dropVerified: doc.data().dropVerified || false,
+        pickupVerifiedAt: doc.data().pickupVerifiedAt?.toDate(),
+        dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setGearRequests(data);
     });
@@ -87,18 +100,24 @@ export default function RequestsPage() {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         type: 'rental' as const,
-        userId: doc.data().userId,
-        userName: doc.data().userName,
-        category: doc.data().equipmentName || doc.data().equipmentCategory,
+        userId: doc.data().requesterId || doc.data().userId,
+        userName: doc.data().requesterName || doc.data().userName || 'Unknown',
+        category: doc.data().title || doc.data().equipmentName || doc.data().equipmentCategory || 'Rental Request',
         description: doc.data().description,
-        location: doc.data().location,
-        startDate: doc.data().startDate?.toDate() || new Date(),
-        endDate: doc.data().endDate?.toDate(),
+        location: doc.data().details?.location || doc.data().location || '',
+        startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
+        endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
-        timeoutAt: doc.data().timeoutAt?.toDate(),
+        timeoutAt: doc.data().expiresAt?.toDate() || doc.data().timeoutAt?.toDate(),
         assignedId: doc.data().acceptedByLenderId,
         assignedName: doc.data().acceptedByLenderName,
         createdAt: doc.data().createdAt?.toDate() || new Date(),
+        pickupOtp: doc.data().pickupOtp,
+        dropOtp: doc.data().dropOtp,
+        pickupVerified: doc.data().pickupVerified || false,
+        dropVerified: doc.data().dropVerified || false,
+        pickupVerifiedAt: doc.data().pickupVerifiedAt?.toDate(),
+        dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setRentalRequests(data);
     });
@@ -109,18 +128,24 @@ export default function RequestsPage() {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         type: 'workforce' as const,
-        userId: doc.data().userId,
-        userName: doc.data().userName,
-        category: doc.data().roleRequired || doc.data().crewCategory,
+        userId: doc.data().requesterId || doc.data().userId,
+        userName: doc.data().requesterName || doc.data().userName || 'Unknown',
+        category: doc.data().title || doc.data().roleRequired || doc.data().crewCategory || 'Workforce Request',
         description: doc.data().description,
-        location: doc.data().location,
-        startDate: doc.data().startDate?.toDate() || new Date(),
-        endDate: doc.data().endDate?.toDate(),
+        location: doc.data().details?.location || doc.data().location || '',
+        startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
+        endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
-        timeoutAt: doc.data().timeoutAt?.toDate(),
-        assignedId: doc.data().assignedWorkerId,
-        assignedName: doc.data().assignedWorkerName,
+        timeoutAt: doc.data().expiresAt?.toDate() || doc.data().timeoutAt?.toDate(),
+        assignedId: doc.data().acceptedByLenderId || doc.data().assignedWorkerId,
+        assignedName: doc.data().acceptedByLenderName || doc.data().assignedWorkerName,
         createdAt: doc.data().createdAt?.toDate() || new Date(),
+        pickupOtp: doc.data().pickupOtp,
+        dropOtp: doc.data().dropOtp,
+        pickupVerified: doc.data().pickupVerified || false,
+        dropVerified: doc.data().dropVerified || false,
+        pickupVerifiedAt: doc.data().pickupVerifiedAt?.toDate(),
+        dropVerifiedAt: doc.data().dropVerifiedAt?.toDate(),
       }));
       setWorkforceRequests(data);
       setLoading(false);
@@ -174,6 +199,7 @@ export default function RequestsPage() {
     const colors: Record<string, string> = {
       searching: 'bg-yellow-100 text-yellow-700',
       accepted: 'bg-green-100 text-green-700',
+      active: 'bg-purple-100 text-purple-700',
       completed: 'bg-blue-100 text-blue-700',
       cancelled: 'bg-gray-100 text-gray-700',
       expired: 'bg-red-100 text-red-700',
@@ -182,6 +208,24 @@ export default function RequestsPage() {
       <span className={`rounded-full px-2 py-1 text-xs font-medium ${colors[status] || 'bg-gray-100'}`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
+    );
+  };
+
+  const getOtpVerificationBadge = (request: BroadcastRequest) => {
+    if (!request.pickupOtp && !request.dropOtp) return null;
+    
+    const pickupStatus = request.pickupVerified ? 'verified' : 'pending';
+    const dropStatus = request.dropVerified ? 'verified' : 'pending';
+    
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`rounded px-1.5 py-0.5 text-xs ${request.pickupVerified ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+          Pickup: {pickupStatus}
+        </span>
+        <span className={`rounded px-1.5 py-0.5 text-xs ${request.dropVerified ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+          Drop: {dropStatus}
+        </span>
+      </div>
     );
   };
 
@@ -329,6 +373,7 @@ export default function RequestsPage() {
           <option value="all">All Status</option>
           <option value="searching">Searching</option>
           <option value="accepted">Accepted</option>
+          <option value="active">Active (In Progress)</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
           <option value="expired">Expired</option>
@@ -356,6 +401,9 @@ export default function RequestsPage() {
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                OTP Verification
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Assigned To
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -366,7 +414,7 @@ export default function RequestsPage() {
           <tbody className="divide-y divide-gray-200">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   No requests found
                 </td>
               </tr>
@@ -399,6 +447,9 @@ export default function RequestsPage() {
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     {getStatusBadge(request.status)}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4">
+                    {getOtpVerificationBadge(request) || <span className="text-gray-400 text-xs">N/A</span>}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     {request.assignedName ? (

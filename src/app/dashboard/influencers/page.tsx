@@ -27,6 +27,7 @@ import {
   updateDoc,
   deleteDoc,
   Timestamp,
+  where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -59,17 +60,36 @@ export default function InfluencersPage() {
   const pageSize = 15;
 
   useEffect(() => {
-    const q = query(collection(db, 'influencer_profiles'), orderBy('followersCount', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
+    // Query users with verified influencer role
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('influencerVerification.status', '==', 'verified')
+    );
+    const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+      const usersData = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(),
+        userId: doc.id,
+        name: doc.data().displayName || doc.data().name || 'Unknown',
+        bio: doc.data().bio || '',
+        category: doc.data().influencerCategory || 'General',
+        platforms: doc.data().platforms || [],
+        followersCount: doc.data().followersCount || 0,
+        rating: doc.data().rating || 0,
+        totalRatings: doc.data().totalRatings || 0,
+        pricePerPost: doc.data().pricePerPost,
+        profileImageUrl: doc.data().profileImageUrl || doc.data().photoURL,
+        portfolioUrl: doc.data().portfolioUrl,
+        isAvailable: doc.data().isAvailable !== false,
+        isVerified: true,
         createdAt: doc.data().createdAt?.toDate() || new Date(),
       })) as InfluencerProfile[];
-      setInfluencers(data);
+      setInfluencers(usersData);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubUsers();
+    };
   }, []);
 
   const handleToggleVerified = async (influencer: InfluencerProfile) => {

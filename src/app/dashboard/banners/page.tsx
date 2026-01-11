@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, Image } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit2, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, Image, Upload, X, Loader2 } from 'lucide-react';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import {
   getHeroBanners,
   createHeroBanner,
@@ -23,6 +25,10 @@ export default function BannersPage() {
     isActive: true,
     order: 0,
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadBanners();
@@ -69,6 +75,7 @@ export default function BannersPage() {
       isActive: banner.isActive,
       order: banner.order,
     });
+    setPreviewUrl(banner.imageUrl || null);
     setShowModal(true);
   };
 
@@ -127,6 +134,80 @@ export default function BannersPage() {
       isActive: true,
       order: 0,
     });
+    setPreviewUrl(null);
+    setUploadProgress(0);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      alert('Please upload a valid image file (JPG, PNG, or WebP)');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size should be less than 2MB');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Create a unique filename
+      const timestamp = Date.now();
+      const filename = `banners/hero_${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const storageRef = ref(storage, filename);
+
+      // Upload file with progress tracking
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          alert('Failed to upload image. Please try again.');
+          setUploading(false);
+        },
+        async () => {
+          // Get download URL
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          setFormData({ ...formData, imageUrl: downloadUrl });
+          setPreviewUrl(downloadUrl);
+          setUploading(false);
+        }
+      );
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image. Please try again.');
+      setUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Show local preview immediately
+      const localPreview = URL.createObjectURL(file);
+      setPreviewUrl(localPreview);
+      handleImageUpload(file);
+    }
+  };
+
+  const clearImage = () => {
+    setFormData({ ...formData, imageUrl: '' });
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const openAddModal = () => {
@@ -195,7 +276,7 @@ export default function BannersPage() {
               {/* Content */}
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900">{banner.title}</h3>
-                <p className="text-sm text-gray-600">{banner.subtitle}</p>
+                <p className="text-xs text-gray-500">Image-only banner</p>
                 {banner.linkUrl && (
                   <p className="mt-1 text-xs text-blue-600">{banner.linkUrl}</p>
                 )}
@@ -271,39 +352,109 @@ export default function BannersPage() {
               {editingBanner ? 'Edit Banner' : 'Add New Banner'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                <strong>Note:</strong> Banners are image-only. Upload a complete banner image with any text/graphics already included.
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Title</label>
+                <label className="block text-sm font-medium text-gray-700">Banner Name (for reference only)</label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="e.g., Lights, Camera, Connect."
+                  placeholder="e.g., New Year Promo, Summer Sale"
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500">This name is for admin reference only, not shown in app</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Subtitle</label>
-                <input
-                  type="text"
-                  value={formData.subtitle}
-                  onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="e.g., Discover equipment, crew and more."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Image URL</label>
-                <input
-                  type="url"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="https://..."
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Leave empty to use gradient background
-                </p>
+                <label className="block text-sm font-medium text-gray-700">Banner Image <span className="text-red-500">*</span></label>
+                
+                {/* Image Preview */}
+                {(previewUrl || formData.imageUrl) && (
+                  <div className="mt-2 relative">
+                    <img
+                      src={previewUrl || formData.imageUrl}
+                      alt="Banner preview"
+                      className="w-full h-32 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                <div className="mt-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="banner-image-upload"
+                  />
+                  <label
+                    htmlFor="banner-image-upload"
+                    className={`flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      uploading
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                        <span className="text-blue-600">Uploading... {uploadProgress}%</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5 text-gray-500" />
+                        <span className="text-gray-600">Click to upload image</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+
+                {/* Progress Bar */}
+                {uploading && (
+                  <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* Or enter URL manually */}
+                <div className="mt-3">
+                  <p className="text-xs text-gray-500 mb-1">Or enter image URL manually:</p>
+                  <input
+                    type="url"
+                    value={formData.imageUrl}
+                    onChange={(e) => {
+                      setFormData({ ...formData, imageUrl: e.target.value });
+                      setPreviewUrl(e.target.value || null);
+                    }}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div className="mt-3 rounded-lg bg-blue-50 p-3 text-xs">
+                  <p className="font-semibold text-blue-800">📐 Recommended Image Sizes:</p>
+                  <ul className="mt-1 space-y-1 text-blue-700">
+                    <li>• <strong>Hero Banner:</strong> 1200 x 400 px (3:1 ratio)</li>
+                    <li>• <strong>Mobile optimized:</strong> 750 x 250 px minimum</li>
+                    <li>• <strong>Format:</strong> JPG, PNG, or WebP</li>
+                    <li>• <strong>Max file size:</strong> 2MB</li>
+                  </ul>
+                  <p className="mt-2 text-gray-600">Leave empty to use gradient background</p>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Link URL (Optional)</label>
