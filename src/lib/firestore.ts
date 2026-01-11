@@ -499,27 +499,30 @@ export const getPendingEquipment = (callback: (equipment: Equipment[]) => void) 
 
 export const verifyEquipment = async (
   equipmentId: string,
-  isVerified: boolean,
+  approved: boolean,
   notes?: string
 ) => {
   // Get equipment details first to get owner info
   const equipmentDoc = await getDoc(doc(db, 'equipment', equipmentId));
   const equipmentData = equipmentDoc.data();
   
-  // Update equipment verification status
+  // Update equipment verification status - set both isVerified and isAvailable
   await updateDoc(doc(db, 'equipment', equipmentId), {
-    verificationStatus: isVerified ? 'verified' : 'rejected',
+    isVerified: approved,
+    isAvailable: approved, // Make available when verified
+    verificationStatus: approved ? 'verified' : 'rejected',
     verifiedAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
     ...(notes && { verificationNotes: notes }),
   });
   
   // Create notification for the equipment owner
   if (equipmentData?.ownerId) {
-    const notificationType = isVerified ? 'equipmentVerified' : 'equipmentRejected';
-    const title = isVerified ? 'Equipment Approved! 🎉' : 'Equipment Not Approved';
-    const body = isVerified 
-      ? `Your ${equipmentData.title || 'equipment'} has been verified and is now live on FilmGrid!`
-      : `Your ${equipmentData.title || 'equipment'} was not approved.${notes ? ` Reason: ${notes}` : ' Please contact support for more details.'}`;
+    const notificationType = approved ? 'equipmentVerified' : 'equipmentRejected';
+    const title = approved ? 'Equipment Approved! 🎉' : 'Equipment Not Approved';
+    const body = approved 
+      ? `Your ${equipmentData.title || equipmentData.name || 'equipment'} has been verified and is now live on FilmGrid!`
+      : `Your ${equipmentData.title || equipmentData.name || 'equipment'} was not approved.${notes ? ` Reason: ${notes}` : ' Please contact support at help@filmgrid.com for more details.'}`;
     
     await addDoc(collection(db, 'notifications'), {
       userId: equipmentData.ownerId,
