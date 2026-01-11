@@ -21,6 +21,7 @@ import {
   Trophy,
   Image,
   Bell,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -30,7 +31,8 @@ const navItems = [
   { href: '/dashboard/banners/equipment', label: 'Equipment Banners', icon: Image },
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/verification', label: 'Verification', icon: ShieldCheck },
-  { href: '/dashboard/equipment', label: 'Equipment', icon: Camera },
+  { href: '/dashboard/equipment-catalog', label: 'Equipment Catalog', icon: Package },
+  { href: '/dashboard/equipment', label: 'Lender Equipment', icon: Camera },
   { href: '/dashboard/bookings', label: 'Bookings', icon: Calendar },
   { href: '/dashboard/orders', label: 'Open Orders', icon: Zap },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },

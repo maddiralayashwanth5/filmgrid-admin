@@ -877,3 +877,90 @@ export const updateHeroBanner = async (id: string, data: Partial<HeroBanner>) =>
 export const deleteHeroBanner = async (id: string) => {
   await deleteDoc(doc(db, 'hero_banners', id));
 };
+
+// ==================== EQUIPMENT CATALOG (Master List) ====================
+
+export interface EquipmentCatalogItem {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  description: string;
+  imageUrls: string[];
+  suggestedDailyRate: number;
+  specifications?: Record<string, string>;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Get all catalog items
+export const getEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) => void) => {
+  const q = query(collection(db, 'equipment_catalog'), orderBy('category'), orderBy('brand'), orderBy('name'));
+  return onSnapshot(q, (snapshot) => {
+    const items = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: toDate(doc.data().createdAt),
+      updatedAt: toDate(doc.data().updatedAt),
+    })) as EquipmentCatalogItem[];
+    callback(items);
+  }, (error) => {
+    console.error('Error fetching equipment catalog:', error);
+    callback([]);
+  });
+};
+
+// Get active catalog items only
+export const getActiveEquipmentCatalog = (callback: (items: EquipmentCatalogItem[]) => void) => {
+  const q = query(
+    collection(db, 'equipment_catalog'),
+    where('isActive', '==', true),
+    orderBy('category'),
+    orderBy('name')
+  );
+  return onSnapshot(q, (snapshot) => {
+    const items = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: toDate(doc.data().createdAt),
+      updatedAt: toDate(doc.data().updatedAt),
+    })) as EquipmentCatalogItem[];
+    callback(items);
+  }, (error) => {
+    console.error('Error fetching active equipment catalog:', error);
+    callback([]);
+  });
+};
+
+// Create catalog item
+export const createEquipmentCatalogItem = async (data: Omit<EquipmentCatalogItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const docRef = await addDoc(collection(db, 'equipment_catalog'), {
+    ...data,
+    isActive: data.isActive ?? true,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+// Update catalog item
+export const updateEquipmentCatalogItem = async (id: string, data: Partial<EquipmentCatalogItem>) => {
+  await updateDoc(doc(db, 'equipment_catalog', id), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+// Delete catalog item
+export const deleteEquipmentCatalogItem = async (id: string) => {
+  await deleteDoc(doc(db, 'equipment_catalog', id));
+};
+
+// Toggle catalog item active status
+export const toggleEquipmentCatalogStatus = async (id: string, isActive: boolean) => {
+  await updateDoc(doc(db, 'equipment_catalog', id), {
+    isActive,
+    updatedAt: Timestamp.now(),
+  });
+};
