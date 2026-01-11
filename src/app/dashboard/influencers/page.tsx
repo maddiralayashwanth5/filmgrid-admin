@@ -17,6 +17,7 @@ import {
   ChevronRight,
   X,
   TrendingUp,
+  Award,
 } from 'lucide-react';
 import {
   collection,
@@ -28,6 +29,8 @@ import {
   deleteDoc,
   Timestamp,
   where,
+  setDoc,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -46,6 +49,7 @@ interface InfluencerProfile {
   portfolioUrl?: string;
   isAvailable: boolean;
   isVerified: boolean;
+  isFeatured: boolean;
   createdAt: Date;
 }
 
@@ -57,31 +61,47 @@ export default function InfluencersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [selectedInfluencer, setSelectedInfluencer] = useState<InfluencerProfile | null>(null);
+  const [featuredIds, setFeaturedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   useEffect(() => {
+    // Load featured influencers list
+    const loadFeatured = async () => {
+      try {
+        const featuredDoc = await getDoc(doc(db, 'app_config', 'featured_influencers'));
+        if (featuredDoc.exists()) {
+          const ids = featuredDoc.data().influencerIds || [];
+          setFeaturedIds(new Set(ids));
+        }
+      } catch (error) {
+        console.error('Error loading featured influencers:', error);
+      }
+    };
+    loadFeatured();
+
     // Query users with verified influencer role
     const usersQuery = query(
       collection(db, 'users'),
       where('influencerVerification.status', '==', 'verified')
     );
     const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-      const usersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        userId: doc.id,
-        name: doc.data().displayName || doc.data().name || 'Unknown',
-        bio: doc.data().bio || '',
-        category: doc.data().influencerCategory || 'General',
-        platforms: doc.data().platforms || [],
-        followersCount: doc.data().followersCount || 0,
-        rating: doc.data().rating || 0,
-        totalRatings: doc.data().totalRatings || 0,
-        pricePerPost: doc.data().pricePerPost,
-        profileImageUrl: doc.data().profileImageUrl || doc.data().photoURL,
-        portfolioUrl: doc.data().portfolioUrl,
-        isAvailable: doc.data().isAvailable !== false,
+      const usersData = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        userId: docSnap.id,
+        name: docSnap.data().displayName || docSnap.data().name || 'Unknown',
+        bio: docSnap.data().bio || '',
+        category: docSnap.data().influencerCategory || 'General',
+        platforms: docSnap.data().platforms || [],
+        followersCount: docSnap.data().followersCount || 0,
+        rating: docSnap.data().rating || 0,
+        totalRatings: docSnap.data().totalRatings || 0,
+        pricePerPost: docSnap.data().pricePerPost,
+        profileImageUrl: docSnap.data().profileImageUrl || docSnap.data().avatarUrl || docSnap.data().photoURL,
+        portfolioUrl: docSnap.data().portfolioUrl,
+        isAvailable: docSnap.data().isAvailable !== false,
         isVerified: true,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        isFeatured: false, // Will be set based on featuredIds
+        createdAt: docSnap.data().createdAt?.toDate() || new Date(),
       })) as InfluencerProfile[];
       setInfluencers(usersData);
       setLoading(false);
@@ -101,6 +121,34 @@ export default function InfluencersPage() {
       setShowMenu(null);
     } catch (error) {
       console.error('Error toggling verification:', error);
+    }
+  };
+
+  const handleToggleFeatured = async (influencer: InfluencerProfile) => {
+    try {
+      const isFeatured = featuredIds.has(influencer.id);
+      const newFeaturedIds = new Set(featuredIds);
+      
+      if (isFeatured) {
+        newFeaturedIds.delete(influencer.id);
+      } else {
+        if (newFeaturedIds.size >= 6) {
+          alert('Maximum 6 featured influencers allowed. Remove one first.');
+          return;
+        }
+        newFeaturedIds.add(influencer.id);
+      }
+      
+      // Save to Firestore
+      await setDoc(doc(db, 'app_config', 'featured_influencers'), {
+        influencerIds: Array.from(newFeaturedIds),
+        updatedAt: Timestamp.now(),
+      });
+      
+      setFeaturedIds(newFeaturedIds);
+      setShowMenu(null);
+    } catch (error) {
+      console.error('Error toggling featured status:', error);
     }
   };
 
@@ -175,7 +223,7 @@ export default function InfluencersPage() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-5 gap-4">
         <div className="rounded-lg bg-pink-50 p-4">
           <p className="text-sm text-pink-600">Total Influencers</p>
           <p className="text-2xl font-bold text-pink-700">{influencers.length}</p>
@@ -191,6 +239,10 @@ export default function InfluencersPage() {
           <p className="text-2xl font-bold text-blue-700">
             {influencers.filter((i) => i.isAvailable).length}
           </p>
+        </div>
+        <div className="rounded-lg bg-yellow-50 p-4">
+          <p className="text-sm text-yellow-600">Featured</p>
+          <p className="text-2xl font-bold text-yellow-700">{featuredIds.size}/6</p>
         </div>
         <div className="rounded-lg bg-purple-50 p-4">
           <p className="text-sm text-purple-600">Total Reach</p>
@@ -289,7 +341,12 @@ export default function InfluencersPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{influencer.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-900">{influencer.name}</p>
+                          {featuredIds.has(influencer.id) && (
+                            <Award className="h-4 w-4 text-yellow-500" />
+                          )}
+                        </div>
                         {influencer.isVerified && (
                           <span className="text-xs text-blue-500">✓ Verified</span>
                         )}
@@ -360,6 +417,17 @@ export default function InfluencersPage() {
                             className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
                           >
                             {influencer.isAvailable ? 'Mark Unavailable' : 'Mark Available'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleFeatured(influencer)}
+                            className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${
+                              featuredIds.has(influencer.id)
+                                ? 'text-orange-600 hover:bg-orange-50'
+                                : 'text-yellow-600 hover:bg-yellow-50'
+                            }`}
+                          >
+                            <Award className="h-4 w-4" />
+                            {featuredIds.has(influencer.id) ? 'Remove from Featured' : 'Add to Featured'}
                           </button>
                           <button
                             onClick={() => handleDelete(influencer.id)}
