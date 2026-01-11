@@ -506,10 +506,11 @@ export const verifyEquipment = async (
   const equipmentDoc = await getDoc(doc(db, 'equipment', equipmentId));
   const equipmentData = equipmentDoc.data();
   
-  // Update equipment verification status - set both isVerified and isAvailable
+  // Update equipment verification status - set isVerified, isAvailable, and isActive
   await updateDoc(doc(db, 'equipment', equipmentId), {
     isVerified: approved,
     isAvailable: approved, // Make available when verified
+    isActive: approved, // Also set isActive for admin panel compatibility
     verificationStatus: approved ? 'verified' : 'rejected',
     verifiedAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
