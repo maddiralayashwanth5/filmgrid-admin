@@ -25,8 +25,38 @@ import {
   doc,
   updateDoc,
   Timestamp,
+  GeoPoint,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+
+// Helper function to format location - handles GeoPoint, string, or object with lat/lng
+const formatLocation = (location: any): string => {
+  if (!location) return '';
+  
+  // If it's already a string, return it
+  if (typeof location === 'string') return location;
+  
+  // If it's a GeoPoint or object with latitude/longitude
+  if (location instanceof GeoPoint || (location.latitude !== undefined && location.longitude !== undefined)) {
+    const lat = location.latitude || location._lat;
+    const lng = location.longitude || location._long;
+    // Return a placeholder - ideally this would be reverse geocoded
+    // For now, we'll show a more user-friendly format
+    return `Location (${lat?.toFixed(2)}°, ${lng?.toFixed(2)}°)`;
+  }
+  
+  // If it's an object with _lat/_long (Firestore GeoPoint serialized)
+  if (location._lat !== undefined && location._long !== undefined) {
+    return `Location (${location._lat?.toFixed(2)}°, ${location._long?.toFixed(2)}°)`;
+  }
+  
+  // If it has a city or address field
+  if (location.city) return location.city;
+  if (location.address) return location.address;
+  if (location.name) return location.name;
+  
+  return String(location);
+};
 
 interface BroadcastRequest {
   id: string;
@@ -77,7 +107,7 @@ export default function RequestsPage() {
         userName: doc.data().requesterName || doc.data().userName || 'Unknown',
         category: doc.data().title || doc.data().gearCategory || 'Gear Request',
         description: doc.data().description,
-        location: doc.data().details?.location || doc.data().location || '',
+        location: formatLocation(doc.data().details?.location || doc.data().location),
         startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
         endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
@@ -109,7 +139,7 @@ export default function RequestsPage() {
         userName: doc.data().requesterName || doc.data().userName || 'Unknown',
         category: doc.data().title || doc.data().equipmentName || doc.data().equipmentCategory || 'Rental Request',
         description: doc.data().description,
-        location: doc.data().details?.location || doc.data().location || '',
+        location: formatLocation(doc.data().details?.location || doc.data().location),
         startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
         endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
@@ -141,7 +171,7 @@ export default function RequestsPage() {
         userName: doc.data().requesterName || doc.data().userName || 'Unknown',
         category: doc.data().title || doc.data().roleRequired || doc.data().crewCategory || 'Workforce Request',
         description: doc.data().description,
-        location: doc.data().details?.location || doc.data().location || '',
+        location: formatLocation(doc.data().details?.location || doc.data().location),
         startDate: doc.data().startDate?.toDate() || doc.data().createdAt?.toDate() || new Date(),
         endDate: doc.data().endDate?.toDate() || doc.data().expiresAt?.toDate(),
         status: doc.data().status,
