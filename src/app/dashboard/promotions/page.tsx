@@ -180,6 +180,20 @@ export default function PromotionsPage() {
     setShowForm(true);
   };
 
+  const extractYouTubeId = (url: string): string | null => {
+    const regexes = [
+      /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
+      /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
+    ];
+    for (const regex of regexes) {
+      const match = url.match(regex);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
   const handleSaveVideo = async () => {
     if (!formData.title || !formData.videoUrl) {
       alert('Please fill in all required fields');
@@ -188,11 +202,20 @@ export default function PromotionsPage() {
 
     setSaving(true);
     try {
+      // Auto-generate YouTube thumbnail if not provided
+      let thumbnailUrl = formData.thumbnailUrl;
+      if (!thumbnailUrl) {
+        const youtubeId = extractYouTubeId(formData.videoUrl);
+        if (youtubeId) {
+          thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+        }
+      }
+
       const videoData = {
         title: formData.title,
         description: formData.description,
         videoUrl: formData.videoUrl,
-        thumbnailUrl: formData.thumbnailUrl,
+        thumbnailUrl: thumbnailUrl,
         category: formData.category,
         duration: parseInt(formData.duration) || 0,
         userName: formData.userName,
@@ -707,21 +730,48 @@ export default function PromotionsPage() {
                 <input
                   type="url"
                   value={formData.videoUrl}
-                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    const youtubeId = extractYouTubeId(url);
+                    const autoThumbnail = youtubeId 
+                      ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` 
+                      : '';
+                    setFormData({ 
+                      ...formData, 
+                      videoUrl: url,
+                      thumbnailUrl: autoThumbnail || formData.thumbnailUrl,
+                    });
+                  }}
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-purple-500 focus:outline-none"
                   placeholder="https://youtube.com/watch?v=..."
                 />
+                {formData.videoUrl && extractYouTubeId(formData.videoUrl) && (
+                  <p className="mt-1 text-xs text-green-600">✓ YouTube thumbnail will be auto-extracted</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Thumbnail URL</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Thumbnail URL <span className="text-gray-400">(auto-filled for YouTube)</span>
+                </label>
                 <input
                   type="url"
                   value={formData.thumbnailUrl}
                   onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-purple-500 focus:outline-none"
-                  placeholder="https://example.com/thumbnail.jpg"
+                  className="mt-1 w-full rounded-lg border bg-gray-50 px-3 py-2 focus:border-purple-500 focus:outline-none"
+                  placeholder="Auto-generated from YouTube URL"
+                  readOnly={!!extractYouTubeId(formData.videoUrl)}
                 />
+                {formData.thumbnailUrl && (
+                  <div className="mt-2">
+                    <img 
+                      src={formData.thumbnailUrl} 
+                      alt="Thumbnail preview" 
+                      className="h-20 w-36 rounded-lg object-cover border"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
