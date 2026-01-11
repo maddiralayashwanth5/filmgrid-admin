@@ -346,6 +346,51 @@ export const resetUserVerification = async (userId: string) => {
   });
 };
 
+// Toggle individual role verification status
+export const toggleRoleVerification = async (
+  userId: string,
+  role: 'filmmaker' | 'lender' | 'worker' | 'influencer',
+  verified: boolean
+) => {
+  const fieldName = `${role}Verification`;
+  await updateDoc(doc(db, 'users', userId), {
+    [fieldName]: {
+      status: verified ? 'verified' : 'notVerified',
+      verifiedAt: verified ? Timestamp.now() : null,
+    },
+    updatedAt: Timestamp.now(),
+  });
+};
+
+// Set all roles verification at once
+export const setAllRolesVerification = async (userId: string, verified: boolean) => {
+  const status = verified ? 'verified' : 'notVerified';
+  const verifiedAt = verified ? Timestamp.now() : null;
+  
+  await updateDoc(doc(db, 'users', userId), {
+    filmmakerVerification: { status, verifiedAt },
+    lenderVerification: { status, verifiedAt },
+    workerVerification: { status, verifiedAt },
+    influencerVerification: { status, verifiedAt },
+    verificationStatus: status,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+// Get user's role verification statuses
+export const getUserRoleVerifications = async (userId: string) => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (!userDoc.exists()) return null;
+  
+  const data = userDoc.data();
+  return {
+    filmmaker: (data.filmmakerVerification?.status === 'verified'),
+    lender: (data.lenderVerification?.status === 'verified'),
+    worker: (data.workerVerification?.status === 'verified'),
+    influencer: (data.influencerVerification?.status === 'verified'),
+  };
+};
+
 export const resetAllUsersVerification = async () => {
   const usersSnapshot = await getDocs(collection(db, 'users'));
   const batch: Promise<void>[] = [];

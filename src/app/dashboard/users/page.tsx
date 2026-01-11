@@ -15,7 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification } from '@/lib/firestore';
+import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification } from '@/lib/firestore';
 import type { User, ContactInfo } from '@/lib/types';
 
 export default function UsersPage() {
@@ -30,6 +30,8 @@ export default function UsersPage() {
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'pending' | 'verified'>('all');
   const [showResetAllModal, setShowResetAllModal] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [showRoleVerificationModal, setShowRoleVerificationModal] = useState<User | null>(null);
+  const [roleVerifications, setRoleVerifications] = useState<Record<string, boolean>>({});
   const pageSize = 15;
 
   useEffect(() => {
@@ -74,6 +76,45 @@ export default function UsersPage() {
       setShowMenu(null);
     } catch (error) {
       console.error('Error resetting verification:', error);
+    }
+  };
+
+  const openRoleVerificationModal = (user: User) => {
+    // Parse role verifications from user data
+    const userData = user as any;
+    setRoleVerifications({
+      filmmaker: userData.filmmakerVerification?.status === 'verified',
+      lender: userData.lenderVerification?.status === 'verified',
+      worker: userData.workerVerification?.status === 'verified',
+      influencer: userData.influencerVerification?.status === 'verified',
+    });
+    setShowRoleVerificationModal(user);
+    setShowMenu(null);
+  };
+
+  const handleToggleRoleVerification = async (role: 'filmmaker' | 'lender' | 'worker' | 'influencer', verified: boolean) => {
+    if (!showRoleVerificationModal) return;
+    try {
+      await toggleRoleVerification(showRoleVerificationModal.uid, role, verified);
+      setRoleVerifications(prev => ({ ...prev, [role]: verified }));
+    } catch (error) {
+      console.error('Error toggling role verification:', error);
+    }
+  };
+
+  const handleSetAllRoles = async (verified: boolean) => {
+    if (!showRoleVerificationModal) return;
+    try {
+      await setAllRolesVerification(showRoleVerificationModal.uid, verified);
+      setRoleVerifications({
+        filmmaker: verified,
+        lender: verified,
+        worker: verified,
+        influencer: verified,
+      });
+      setShowRoleVerificationModal(null);
+    } catch (error) {
+      console.error('Error setting all roles:', error);
     }
   };
 
@@ -271,11 +312,18 @@ export default function UsersPage() {
                   </button>
                 )}
                 <button
+                  onClick={() => openRoleVerificationModal(user)}
+                  className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50"
+                >
+                  <Shield className="h-4 w-4" />
+                  Manage Verification
+                </button>
+                <button
                   onClick={() => handleResetVerification(user.uid)}
                   className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50"
                 >
-                  <Shield className="h-4 w-4" />
-                  Reset Verification
+                  <XCircle className="h-4 w-4" />
+                  Reset All Verification
                 </button>
               </div>
             </div>
@@ -704,6 +752,87 @@ export default function UsersPage() {
                 className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {resetting ? 'Resetting...' : 'Reset All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role Verification Modal */}
+      {showRoleVerificationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Manage Verification</h3>
+                <p className="text-sm text-gray-500">{showRoleVerificationModal.displayName}</p>
+              </div>
+              <button
+                onClick={() => setShowRoleVerificationModal(null)}
+                className="rounded-full p-1 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mb-4 text-sm text-gray-600">
+              Toggle verification status for each role. Changes are saved immediately.
+            </p>
+
+            <div className="space-y-3">
+              {(['filmmaker', 'lender', 'worker', 'influencer'] as const).map((role) => {
+                const roleNames: Record<string, string> = {
+                  filmmaker: 'Filmmaker',
+                  lender: 'Gear Renter',
+                  worker: 'Film Worker',
+                  influencer: 'Influencer',
+                };
+                const isVerified = roleVerifications[role] || false;
+                return (
+                  <div
+                    key={role}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isVerified ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-gray-400" />
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-900">{roleNames[role]}</p>
+                        <p className="text-xs text-gray-500">
+                          {isVerified ? 'Verified' : 'Not Verified'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleToggleRoleVerification(role, !isVerified)}
+                      className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                        isVerified
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                          : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {isVerified ? 'Revoke' : 'Verify'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => handleSetAllRoles(false)}
+                className="flex-1 rounded-lg border border-red-300 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Revoke All
+              </button>
+              <button
+                onClick={() => handleSetAllRoles(true)}
+                className="flex-1 rounded-lg bg-green-600 py-2 text-sm font-medium text-white hover:bg-green-700"
+              >
+                Verify All
               </button>
             </div>
           </div>
