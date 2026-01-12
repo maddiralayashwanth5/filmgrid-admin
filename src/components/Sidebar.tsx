@@ -29,6 +29,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/banners', label: 'Hero Banners', icon: Image },
   { href: '/dashboard/banners/equipment', label: 'Equipment Banners', icon: Image },
+  { href: '/dashboard/banners/crew', label: 'Crew Banners', icon: Image },
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/dashboard/equipment-catalog', label: 'Equipment Catalog', icon: Package },
