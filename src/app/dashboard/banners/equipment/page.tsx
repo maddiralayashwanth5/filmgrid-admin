@@ -356,20 +356,23 @@ export default function EquipmentBannersPage() {
 
               {/* Title */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Title <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
                   placeholder="e.g., New Arrivals"
-                  required
                 />
               </div>
 
               {/* Subtitle */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Subtitle</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Subtitle <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.subtitle}
@@ -381,7 +384,9 @@ export default function EquipmentBannersPage() {
 
               {/* Button Text */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Button Text</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Button Text <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.buttonText}
