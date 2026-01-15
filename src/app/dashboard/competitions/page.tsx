@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   Trophy,
@@ -24,6 +24,9 @@ import {
   Play,
   Pause,
   Save,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import {
   collection,
@@ -38,7 +41,8 @@ import {
   getDocs,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
 type CompetitionStatus = 'draft' | 'upcoming' | 'active' | 'closed' | 'cancelled';
@@ -109,6 +113,8 @@ export default function CompetitionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingCompetition, setEditingCompetition] = useState<Competition | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const pageSize = 10;
 
   const [formData, setFormData] = useState({
@@ -195,6 +201,37 @@ export default function CompetitionsPage() {
       });
     }
     setShowForm(true);
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const fileName = `competition_banners/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      setFormData({ ...formData, bannerUrl: downloadUrl });
+    } catch (error) {
+      console.error('Error uploading banner:', error);
+      alert('Failed to upload banner image');
+    } finally {
+      setUploadingBanner(false);
+    }
   };
 
   const handleSaveCompetition = async () => {
@@ -759,25 +796,61 @@ export default function CompetitionsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Banner Image URL</label>
+                <label className="block text-sm font-medium text-gray-700">Banner Image</label>
                 <input
-                  type="text"
-                  value={formData.bannerUrl}
-                  onChange={(e) => setFormData({ ...formData, bannerUrl: e.target.value })}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
-                  placeholder="https://example.com/banner.jpg"
+                  type="file"
+                  ref={bannerInputRef}
+                  onChange={handleBannerUpload}
+                  accept="image/*"
+                  className="hidden"
                 />
-                {formData.bannerUrl && (
-                  <div className="mt-2">
+                {formData.bannerUrl ? (
+                  <div className="mt-2 relative">
                     <img
                       src={formData.bannerUrl}
                       alt="Banner preview"
-                      className="h-32 w-full rounded-lg object-cover"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                      className="h-40 w-full rounded-lg object-cover"
                     />
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => bannerInputRef.current?.click()}
+                        className="rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        title="Change image"
+                      >
+                        <Edit className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, bannerUrl: '' })}
+                        className="rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        title="Remove image"
+                      >
+                        <X className="h-4 w-4 text-red-600" />
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    disabled={uploadingBanner}
+                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-8 text-gray-500 hover:border-yellow-500 hover:text-yellow-600 disabled:opacity-50"
+                  >
+                    {uploadingBanner ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6" />
+                        <span>Click to upload banner image</span>
+                      </>
+                    )}
+                  </button>
                 )}
-                <p className="mt-1 text-xs text-gray-500">Recommended size: 1200x400px. This will be displayed as the competition header.</p>
+                <p className="mt-1 text-xs text-gray-500">Recommended size: 1200x400px. Max 5MB. This will be displayed as the competition header.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
