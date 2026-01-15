@@ -67,6 +67,7 @@ interface Submission {
   competitionId: string;
   userId: string;
   userName: string;
+  userFgId?: string;
   videoUrls: string[];
   status: SubmissionStatus;
   submittedAt: Date;
@@ -103,6 +104,7 @@ export default function CompetitionsPage() {
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [viewingSubmissionsFor, setViewingSubmissionsFor] = useState<Competition | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCompetition, setEditingCompetition] = useState<Competition | null>(null);
   const [saving, setSaving] = useState(false);
@@ -524,6 +526,15 @@ export default function CompetitionsPage() {
                               >
                                 <Edit className="h-4 w-4" /> Edit
                               </button>
+                              <button
+                                onClick={() => {
+                                  setViewingSubmissionsFor(comp);
+                                  setShowMenu(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
+                              >
+                                <Users className="h-4 w-4" /> View Submissions ({getSubmissionCount(comp.id)})
+                              </button>
                               <p className="border-t px-4 py-2 text-xs font-medium text-gray-500">Change Status</p>
                               {(['draft', 'upcoming', 'active', 'closed', 'cancelled'] as CompetitionStatus[]).map((status) => (
                                 <button
@@ -642,35 +653,33 @@ export default function CompetitionsPage() {
                       <td className="whitespace-nowrap px-6 py-4">
                         <p className="text-sm text-gray-600">{format(sub.submittedAt, 'MMM d, yyyy h:mm a')}</p>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${submissionStatusColors[sub.status]}`}>
-                          {sub.status.toUpperCase()}
-                        </span>
+                      <td className="whitespace-nowrap px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={sub.status}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as SubmissionStatus;
+                            if (newStatus === 'disqualified') {
+                              const reason = prompt('Disqualification reason:');
+                              if (reason) handleSubmissionStatus(sub.id, newStatus, reason);
+                            } else {
+                              handleSubmissionStatus(sub.id, newStatus);
+                            }
+                          }}
+                          className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${submissionStatusColors[sub.status]}`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="submitted">Submitted</option>
+                          <option value="winner">Winner</option>
+                          <option value="disqualified">Disqualified</option>
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          {sub.status === 'submitted' && (
-                            <>
-                              <button
-                                onClick={() => handleSubmissionStatus(sub.id, 'winner')}
-                                className="rounded bg-green-100 p-1 text-green-600 hover:bg-green-200"
-                                title="Mark as Winner"
-                              >
-                                <Award className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const reason = prompt('Disqualification reason:');
-                                  if (reason) handleSubmissionStatus(sub.id, 'disqualified', reason);
-                                }}
-                                className="rounded bg-red-100 p-1 text-red-600 hover:bg-red-200"
-                                title="Disqualify"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => setSelectedSubmission(sub)}
+                          className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-600 hover:bg-blue-200"
+                        >
+                          View
+                        </button>
                       </td>
                     </tr>
                   );
@@ -957,6 +966,121 @@ export default function CompetitionsPage() {
       )}
 
       {/* Submission Detail Modal */}
+      {/* Competition Submissions List Modal */}
+      {viewingSubmissionsFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Submissions for {viewingSubmissionsFor.title}</h2>
+                <p className="text-sm text-gray-500">{getSubmissionCount(viewingSubmissionsFor.id)} total submissions</p>
+              </div>
+              <button onClick={() => setViewingSubmissionsFor(null)} className="rounded-full p-1 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="rounded-lg border">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Name
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      FG_ID
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Videos
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Submitted
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {submissions.filter(s => s.competitionId === viewingSubmissionsFor.id).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                        No submissions yet for this competition
+                      </td>
+                    </tr>
+                  ) : (
+                    submissions
+                      .filter(s => s.competitionId === viewingSubmissionsFor.id)
+                      .map((sub) => (
+                        <tr key={sub.id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <p className="font-medium text-gray-900">{sub.userName}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <p className="font-mono text-sm text-gray-600">{sub.userFgId || sub.userId.slice(0, 8)}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <Video className="h-4 w-4 text-gray-400" />
+                              <span>{sub.videoUrls?.length || 0} clips</span>
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <p className="text-sm text-gray-600">{format(sub.submittedAt, 'MMM d, h:mm a')}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <select
+                              value={sub.status}
+                              onChange={(e) => {
+                                const newStatus = e.target.value as SubmissionStatus;
+                                if (newStatus === 'disqualified') {
+                                  const reason = prompt('Disqualification reason:');
+                                  if (reason) handleSubmissionStatus(sub.id, newStatus, reason);
+                                } else {
+                                  handleSubmissionStatus(sub.id, newStatus);
+                                }
+                              }}
+                              className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${submissionStatusColors[sub.status]}`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="submitted">Submitted</option>
+                              <option value="winner">Winner</option>
+                              <option value="disqualified">Disqualified</option>
+                            </select>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <button
+                              onClick={() => {
+                                setSelectedSubmission(sub);
+                                setViewingSubmissionsFor(null);
+                              }}
+                              className="rounded bg-blue-50 px-3 py-1 text-sm text-blue-600 hover:bg-blue-100"
+                            >
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setViewingSubmissionsFor(null)}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium hover:bg-gray-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedSubmission && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
@@ -977,7 +1101,8 @@ export default function CompetitionsPage() {
               <div className="rounded-lg bg-gray-50 p-4">
                 <h4 className="text-sm font-medium text-gray-600">Submitted By</h4>
                 <p className="font-medium">{selectedSubmission.userName}</p>
-                <p className="text-xs text-gray-500">ID: {selectedSubmission.userId}</p>
+                <p className="text-xs text-gray-500">FG_ID: {selectedSubmission.userFgId || 'N/A'}</p>
+                <p className="text-xs text-gray-500">User ID: {selectedSubmission.userId}</p>
               </div>
 
               <div>
