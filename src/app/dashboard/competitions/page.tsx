@@ -272,10 +272,23 @@ export default function CompetitionsPage() {
 
   const handleSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus, reason?: string) => {
     try {
+      // Find the submission to get required fields for Firestore rules
+      const submission = submissions.find(s => s.id === submissionId);
+      if (!submission) {
+        console.error('Submission not found');
+        return;
+      }
+
       const updateData: any = {
         status: newStatus,
         reviewedAt: Timestamp.now(),
         reviewedBy: user?.uid || 'admin',
+        // Required fields that must be preserved per Firestore rules
+        userId: submission.userId,
+        competitionId: submission.competitionId,
+        videoUrls: submission.videoUrls,
+        platformOwned: true,
+        creatorRights: 'none',
       };
       if (reason) {
         updateData.disqualificationReason = reason;
@@ -283,6 +296,7 @@ export default function CompetitionsPage() {
       await updateDoc(doc(db, 'competition_submissions', submissionId), updateData);
     } catch (error) {
       console.error('Error updating submission:', error);
+      alert('Failed to update submission status. Please try again.');
     }
   };
 
