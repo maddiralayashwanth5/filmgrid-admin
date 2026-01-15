@@ -54,6 +54,7 @@ interface Job {
   applicationDeadline?: Date;
   isActive: boolean;
   isVerified: boolean;
+  isLiveJob: boolean;
   applicationsCount: number;
   createdAt: Date;
 }
@@ -108,6 +109,8 @@ export default function JobsPage() {
     experienceLevel: 'entry',
     applicationDeadline: '',
     posterName: 'FilmGrid',
+    isLiveJob: true,
+    sendNotification: true,
   });
 
   useEffect(() => {
@@ -180,6 +183,8 @@ export default function JobsPage() {
           ? format(job.applicationDeadline, 'yyyy-MM-dd')
           : '',
         posterName: job.posterName || 'FilmGrid',
+        isLiveJob: job.isLiveJob ?? true,
+        sendNotification: false,
       });
     } else {
       setEditingJob(null);
@@ -199,6 +204,8 @@ export default function JobsPage() {
         experienceLevel: 'entry',
         applicationDeadline: '',
         posterName: 'FilmGrid',
+        isLiveJob: true,
+        sendNotification: true,
       });
     }
     setShowForm(true);
@@ -233,6 +240,7 @@ export default function JobsPage() {
         posterId: 'admin',
         isVerified: true,
         isActive: true,
+        isLiveJob: formData.isLiveJob,
         applicationsCount: 0,
         updatedAt: Timestamp.now(),
       };
@@ -240,10 +248,28 @@ export default function JobsPage() {
       if (editingJob) {
         await updateDoc(doc(db, 'jobs', editingJob.id), jobData);
       } else {
-        await addDoc(collection(db, 'jobs'), {
+        const docRef = await addDoc(collection(db, 'jobs'), {
           ...jobData,
           createdAt: Timestamp.now(),
         });
+
+        // Send push notification for new live jobs
+        if (formData.isLiveJob && formData.sendNotification) {
+          try {
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const functions = getFunctions();
+            const sendLiveJobNotification = httpsCallable(functions, 'sendLiveJobNotification');
+            await sendLiveJobNotification({
+              jobId: docRef.id,
+              title: formData.title,
+              category: formData.category,
+              city: formData.city,
+            });
+          } catch (notifError) {
+            console.error('Failed to send notification:', notifError);
+            // Don't fail the job creation if notification fails
+          }
+        }
       }
 
       setShowForm(false);
@@ -735,6 +761,44 @@ export default function JobsPage() {
                   onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
                 />
+              </div>
+
+              {/* Live Job Settings */}
+              <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-4">
+                <h3 className="mb-3 flex items-center gap-2 font-medium text-orange-700">
+                  <Briefcase className="h-4 w-4" /> Live Job Notification
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isLiveJob"
+                      checked={formData.isLiveJob}
+                      onChange={(e) => setFormData({ ...formData, isLiveJob: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-600"
+                    />
+                    <label htmlFor="isLiveJob" className="text-sm text-gray-700">
+                      Mark as Live Job (Admin Posted)
+                    </label>
+                  </div>
+                  {formData.isLiveJob && !editingJob && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="sendNotification"
+                        checked={formData.sendNotification}
+                        onChange={(e) => setFormData({ ...formData, sendNotification: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300 text-orange-600"
+                      />
+                      <label htmlFor="sendNotification" className="text-sm text-gray-700">
+                        Send push notification to all users
+                      </label>
+                    </div>
+                  )}
+                  <p className="text-xs text-orange-600">
+                    Live jobs are highlighted in the app and users receive notifications about new opportunities.
+                  </p>
+                </div>
               </div>
             </div>
 
