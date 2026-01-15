@@ -329,8 +329,6 @@ export default function CompetitionsPage() {
         userId: submission.userId,
         competitionId: submission.competitionId,
         videoUrls: submission.videoUrls,
-        platformOwned: true,
-        creatorRights: 'none',
       };
       if (reason) {
         updateData.disqualificationReason = reason;
