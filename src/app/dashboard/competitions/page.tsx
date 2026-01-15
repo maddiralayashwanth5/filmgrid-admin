@@ -516,7 +516,7 @@ export default function CompetitionsPage() {
                             <MoreVertical className="h-5 w-5 text-gray-500" />
                           </button>
                           {showMenu === comp.id && (
-                            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-xl">
+                            <div className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg border bg-white py-1 shadow-xl">
                               <button
                                 onClick={() => {
                                   handleOpenForm(comp);
@@ -536,17 +536,19 @@ export default function CompetitionsPage() {
                                 <Users className="h-4 w-4" /> View Submissions ({getSubmissionCount(comp.id)})
                               </button>
                               <p className="border-t px-4 py-2 text-xs font-medium text-gray-500">Change Status</p>
-                              {(['draft', 'upcoming', 'active', 'closed', 'cancelled'] as CompetitionStatus[]).map((status) => (
-                                <button
-                                  key={status}
-                                  onClick={() => handleStatusChange(comp.id, status)}
-                                  className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                                    comp.status === status ? 'bg-yellow-50 text-yellow-600' : ''
-                                  }`}
-                                >
-                                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                                </button>
-                              ))}
+                              <div className="max-h-48 overflow-y-auto">
+                                {(['draft', 'upcoming', 'active', 'closed', 'cancelled'] as CompetitionStatus[]).map((status) => (
+                                  <button
+                                    key={status}
+                                    onClick={() => handleStatusChange(comp.id, status)}
+                                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                                      comp.status === status ? 'bg-yellow-50 text-yellow-600' : ''
+                                    }`}
+                                  >
+                                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
                               <button
                                 onClick={() => handleDeleteCompetition(comp.id)}
                                 className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
