@@ -62,6 +62,7 @@ interface StoreItem {
   approvedAt?: Date;
   approvedBy?: string;
   rejectionReason?: string;
+  source?: 'sales_items' | 'used_gear';
 }
 
 const EQUIPMENT_CATEGORIES = [
@@ -125,23 +126,77 @@ export default function StoreCataloguePage() {
   });
 
   useEffect(() => {
-    const itemsQuery = query(collection(db, 'sales_items'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(itemsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-        approvedAt: doc.data().approvedAt?.toDate(),
-      })) as StoreItem[];
-      setItems(data);
+    // Listen to both sales_items and used_gear collections
+    const salesItemsQuery = query(collection(db, 'sales_items'), orderBy('createdAt', 'desc'));
+    const usedGearQuery = query(collection(db, 'used_gear'), orderBy('createdAt', 'desc'));
+    
+    let salesItems: StoreItem[] = [];
+    let usedGearItems: StoreItem[] = [];
+    
+    const unsubscribeSales = onSnapshot(salesItemsQuery, (snapshot) => {
+      salesItems = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name || '',
+          description: data.description || '',
+          category: data.category || '',
+          itemType: data.itemType || 'equipment',
+          price: data.price || 0,
+          condition: data.condition || 'Good',
+          location: data.location || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          sellerPhone: data.sellerPhone || '',
+          sellerFgId: data.sellerFgId || '',
+          imageUrl: data.imageUrl || '',
+          images: data.images || [],
+          status: data.status || 'pending',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate(),
+          approvedAt: data.approvedAt?.toDate(),
+          source: 'sales_items' as const,
+        };
+      }) as StoreItem[];
+      setItems([...salesItems, ...usedGearItems].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
       setLoading(false);
     }, (error) => {
-      console.error('Error loading items:', error);
-      setLoading(false);
+      console.error('Error loading sales items:', error);
     });
 
-    return () => unsubscribe();
+    const unsubscribeUsedGear = onSnapshot(usedGearQuery, (snapshot) => {
+      usedGearItems = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.name || data.title,
+          description: data.description || '',
+          category: data.category || '',
+          itemType: data.type === 'Materials & Consumables' ? 'non-equipment' : 'equipment',
+          price: data.price || 0,
+          condition: data.condition || 'Good',
+          location: '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || data.storeName || '',
+          sellerPhone: '',
+          imageUrl: data.images?.[0] || '',
+          images: data.images || [],
+          status: data.status || 'pending',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate(),
+          source: 'used_gear',
+        };
+      }) as StoreItem[];
+      setItems([...salesItems, ...usedGearItems].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+      setLoading(false);
+    }, (error) => {
+      console.error('Error loading used gear:', error);
+    });
+
+    return () => {
+      unsubscribeSales();
+      unsubscribeUsedGear();
+    };
   }, []);
 
   const handleOpenForm = (item?: StoreItem) => {
@@ -225,7 +280,7 @@ export default function StoreCataloguePage() {
     }
   };
 
-  const handleStatusChange = async (itemId: string, newStatus: ItemStatus, reason?: string) => {
+  const handleStatusChange = async (itemId: string, newStatus: ItemStatus, reason?: string, source?: 'sales_items' | 'used_gear') => {
     try {
       const updateData: any = {
         status: newStatus,
@@ -241,7 +296,9 @@ export default function StoreCataloguePage() {
         updateData.rejectionReason = reason;
       }
 
-      await updateDoc(doc(db, 'sales_items', itemId), updateData);
+      // Determine which collection to update
+      const collectionName = source || 'sales_items';
+      await updateDoc(doc(db, collectionName, itemId), updateData);
       setShowMenu(null);
     } catch (error) {
       console.error('Error updating status:', error);
@@ -249,10 +306,11 @@ export default function StoreCataloguePage() {
     }
   };
 
-  const handleDeleteItem = async (itemId: string) => {
+  const handleDeleteItem = async (itemId: string, source?: 'sales_items' | 'used_gear') => {
     if (!confirm('Are you sure you want to delete this item? This cannot be undone.')) return;
     try {
-      await deleteDoc(doc(db, 'sales_items', itemId));
+      const collectionName = source || 'sales_items';
+      await deleteDoc(doc(db, collectionName, itemId));
       setShowMenu(null);
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -511,9 +569,9 @@ export default function StoreCataloguePage() {
                         const newStatus = e.target.value as ItemStatus;
                         if (newStatus === 'rejected') {
                           const reason = prompt('Rejection reason:');
-                          if (reason) handleStatusChange(item.id, newStatus, reason);
+                          if (reason) handleStatusChange(item.id, newStatus, reason, item.source);
                         } else {
-                          handleStatusChange(item.id, newStatus);
+                          handleStatusChange(item.id, newStatus, undefined, item.source);
                         }
                       }}
                       className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${statusColors[item.status]}`}
@@ -553,7 +611,7 @@ export default function StoreCataloguePage() {
                             <Eye className="h-4 w-4" /> View Details
                           </button>
                           <button
-                            onClick={() => handleDeleteItem(item.id)}
+                            onClick={() => handleDeleteItem(item.id, item.source)}
                             className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" /> Delete

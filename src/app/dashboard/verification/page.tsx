@@ -13,6 +13,7 @@ import {
   Briefcase,
   Star,
   Film,
+  Store,
 } from 'lucide-react';
 import { 
   getRoleVerifications, 
@@ -30,6 +31,7 @@ const roleConfig: Record<RoleVerificationType, { name: string; icon: typeof Film
   lender: { name: 'Lender', icon: Camera, color: 'green' },
   worker: { name: 'Crew', icon: Briefcase, color: 'orange' },
   influencer: { name: 'Influencer', icon: Star, color: 'pink' },
+  store: { name: 'Store', icon: Store, color: 'emerald' },
 };
 
 export default function VerificationPage() {
@@ -108,10 +110,12 @@ export default function VerificationPage() {
                 style={roleFilter === role ? {
                   backgroundColor: config.color === 'blue' ? '#dbeafe' : 
                                    config.color === 'green' ? '#dcfce7' :
-                                   config.color === 'orange' ? '#ffedd5' : '#fce7f3',
+                                   config.color === 'orange' ? '#ffedd5' : 
+                                   config.color === 'emerald' ? '#d1fae5' : '#fce7f3',
                   color: config.color === 'blue' ? '#1d4ed8' : 
                          config.color === 'green' ? '#15803d' :
-                         config.color === 'orange' ? '#c2410c' : '#be185d',
+                         config.color === 'orange' ? '#c2410c' : 
+                         config.color === 'emerald' ? '#047857' : '#be185d',
                 } : {}}
               >
                 <Icon className="h-4 w-4" />
@@ -175,6 +179,7 @@ export default function VerificationPage() {
                   roleFilter === 'filmmaker' ? 'bg-blue-100 text-blue-700' :
                   roleFilter === 'lender' ? 'bg-green-100 text-green-700' :
                   roleFilter === 'worker' ? 'bg-orange-100 text-orange-700' :
+                  roleFilter === 'store' ? 'bg-emerald-100 text-emerald-700' :
                   'bg-pink-100 text-pink-700'
                 }`}>
                   {roleConfig[roleFilter].name.toUpperCase()}
@@ -234,6 +239,31 @@ export default function VerificationPage() {
                       <img
                         src={request.unionCardUrl}
                         alt="Union Card"
+                        className="h-24 w-full object-cover transition-transform hover:scale-105"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Store Specific Info */}
+              {roleFilter === 'store' && (
+                <div className="mb-4 rounded-lg bg-emerald-50 p-3">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Store Details</p>
+                  <p className="text-sm font-medium">{request.storeName}</p>
+                  {request.gstin && (
+                    <p className="text-xs text-gray-600">GSTIN: {request.gstin}</p>
+                  )}
+                  <p className="text-xs text-gray-600">Contact: {request.storeContact}</p>
+                  <p className="text-xs text-gray-600 mt-1">{request.storeAddress}</p>
+                  {request.storeImageUrl && (
+                    <div
+                      onClick={() => openImageModal(request.storeImageUrl!)}
+                      className="mt-2 cursor-pointer overflow-hidden rounded-lg border"
+                    >
+                      <img
+                        src={request.storeImageUrl}
+                        alt="Store"
                         className="h-24 w-full object-cover transition-transform hover:scale-105"
                       />
                     </div>

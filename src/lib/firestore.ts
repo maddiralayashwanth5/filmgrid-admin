@@ -146,7 +146,7 @@ export const verifyUserProfile = async (
 
 // ==================== ROLE-SPECIFIC VERIFICATIONS ====================
 
-export type RoleVerificationType = 'filmmaker' | 'lender' | 'worker' | 'influencer';
+export type RoleVerificationType = 'filmmaker' | 'lender' | 'worker' | 'influencer' | 'store';
 
 export interface RoleVerificationRequest {
   id: string;
@@ -170,6 +170,12 @@ export interface RoleVerificationRequest {
   unionId?: string;
   unionCardUrl?: string;
   bio?: string;
+  // Store specific
+  storeName?: string;
+  gstin?: string;
+  storeContact?: string;
+  storeAddress?: string;
+  storeImageUrl?: string;
 }
 
 export const getRoleVerifications = (
@@ -180,6 +186,41 @@ export const getRoleVerifications = (
   let collectionName = 'role_verifications';
   if (role === 'lender') collectionName = 'lender_verifications';
   if (role === 'worker') collectionName = 'crew_verifications';
+  if (role === 'store') collectionName = 'users'; // Store verification is in users collection
+
+  // For store, we query users with storeVerification.status
+  if (role === 'store') {
+    const q = query(
+      collection(db, 'users'),
+      where('storeVerification.status', '==', status)
+    );
+    return onSnapshot(q, (snapshot) => {
+      const requests = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        const storeData = data.storeVerification || {};
+        return {
+          id: docSnap.id,
+          userId: docSnap.id,
+          displayName: data.displayName || '',
+          phone: data.phoneNumber || data.phone || '',
+          role: 'store' as RoleVerificationType,
+          documentUrl: data.idDocumentUrl || '',
+          status: storeData.status || 'pending',
+          submittedAt: toDate(storeData.submittedAt as Timestamp),
+          storeName: storeData.storeName,
+          gstin: storeData.gstin,
+          storeContact: storeData.contactNumber,
+          storeAddress: storeData.address,
+          storeImageUrl: storeData.imageUrl,
+        } as RoleVerificationRequest;
+      });
+      requests.sort((a, b) => (b.submittedAt?.getTime() || 0) - (a.submittedAt?.getTime() || 0));
+      callback(requests);
+    }, (error) => {
+      console.error('Error fetching store verifications:', error);
+      callback([]);
+    });
+  }
 
   // For role_verifications collection (filmmaker/influencer), also filter by role
   const q = collectionName === 'role_verifications'
@@ -232,6 +273,37 @@ export const approveRoleVerification = async (
   request: RoleVerificationRequest,
   adminId: string
 ) => {
+  // Send notification
+  const roleNames: Record<string, string> = {
+    filmmaker: 'Filmmaker',
+    lender: 'Lender',
+    worker: 'Crew',
+    influencer: 'Influencer',
+    store: 'Store',
+  };
+
+  // Handle store verification separately (stored in users collection)
+  if (request.role === 'store') {
+    await updateDoc(doc(db, 'users', request.userId), {
+      'storeVerification.status': 'verified',
+      'storeVerification.verifiedAt': Timestamp.now(),
+      'storeVerification.verifiedBy': adminId,
+      updatedAt: Timestamp.now(),
+    });
+
+    await addDoc(collection(db, 'notifications'), {
+      userId: request.userId,
+      type: 'roleVerified',
+      title: 'Store Verification Approved! 🎉',
+      body: 'Your store verification has been approved. You can now sell on FilmGrid!',
+      data: { verificationType: 'store' },
+      isRead: false,
+      createdAt: Timestamp.now(),
+    });
+    return;
+  }
+
+  // For other roles, update the verification collection
   let collectionName = 'role_verifications';
   if (request.role === 'lender') collectionName = 'lender_verifications';
   if (request.role === 'worker') collectionName = 'crew_verifications';
@@ -254,14 +326,6 @@ export const approveRoleVerification = async (
     updatedAt: Timestamp.now(),
   });
 
-  // Send notification
-  const roleNames: Record<string, string> = {
-    filmmaker: 'Filmmaker',
-    lender: 'Lender',
-    worker: 'Crew',
-    influencer: 'Influencer',
-  };
-
   await addDoc(collection(db, 'notifications'), {
     userId: request.userId,
     type: 'roleVerified',
@@ -278,6 +342,38 @@ export const rejectRoleVerification = async (
   adminId: string,
   notes: string
 ) => {
+  // Send notification
+  const roleNames: Record<string, string> = {
+    filmmaker: 'Filmmaker',
+    lender: 'Lender',
+    worker: 'Crew',
+    influencer: 'Influencer',
+    store: 'Store',
+  };
+
+  // Handle store rejection separately (stored in users collection)
+  if (request.role === 'store') {
+    await updateDoc(doc(db, 'users', request.userId), {
+      'storeVerification.status': 'rejected',
+      'storeVerification.rejectedAt': Timestamp.now(),
+      'storeVerification.rejectedBy': adminId,
+      'storeVerification.rejectionNotes': notes,
+      updatedAt: Timestamp.now(),
+    });
+
+    await addDoc(collection(db, 'notifications'), {
+      userId: request.userId,
+      type: 'roleRejected',
+      title: 'Store Verification Not Approved',
+      body: `Your store verification was not approved. ${notes}`,
+      data: { verificationType: 'store' },
+      isRead: false,
+      createdAt: Timestamp.now(),
+    });
+    return;
+  }
+
+  // For other roles, update the verification collection
   let collectionName = 'role_verifications';
   if (request.role === 'lender') collectionName = 'lender_verifications';
   if (request.role === 'worker') collectionName = 'crew_verifications';
@@ -299,14 +395,6 @@ export const rejectRoleVerification = async (
     },
     updatedAt: Timestamp.now(),
   });
-
-  // Send notification
-  const roleNames: Record<string, string> = {
-    filmmaker: 'Filmmaker',
-    lender: 'Lender',
-    worker: 'Crew',
-    influencer: 'Influencer',
-  };
 
   await addDoc(collection(db, 'notifications'), {
     userId: request.userId,
