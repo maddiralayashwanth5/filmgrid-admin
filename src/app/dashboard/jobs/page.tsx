@@ -223,9 +223,11 @@ export default function JobsPage() {
         title: formData.title,
         description: formData.description,
         category: formData.category,
+        type: formData.jobType, // Mobile app expects 'type' not 'jobType'
         jobType: formData.jobType,
         location: formData.location,
         city: formData.city,
+        company: formData.posterName, // Mobile app expects 'company'
         isRemote: formData.isRemote,
         salaryMin: formData.salaryMin ? parseFloat(formData.salaryMin) : null,
         salaryMax: formData.salaryMax ? parseFloat(formData.salaryMax) : null,
@@ -238,10 +240,18 @@ export default function JobsPage() {
           : null,
         posterName: formData.posterName,
         posterId: 'admin',
+        postedBy: 'admin', // Mobile app expects 'postedBy'
+        contactName: formData.posterName,
+        contactPhone: '',
+        contactEmail: '',
         isVerified: true,
         isActive: true,
+        status: 'active', // Mobile app filters by status field
         isLiveJob: formData.isLiveJob,
         applicationsCount: 0,
+        viewCount: 0,
+        unlockCount: 0,
+        creditsRequired: 1,
         updatedAt: Timestamp.now(),
       };
 
@@ -251,6 +261,7 @@ export default function JobsPage() {
         const docRef = await addDoc(collection(db, 'jobs'), {
           ...jobData,
           createdAt: Timestamp.now(),
+          postedAt: Timestamp.now(), // Mobile app uses postedAt for ordering
         });
 
         // Send push notification for new live jobs
