@@ -50,6 +50,7 @@ interface Competition {
   description: string;
   rules: string;
   entryFee: number;
+  bannerUrl?: string;
   razorpayPlanId?: string;
   razorpayProductId?: string;
   startTime: Date;
@@ -115,6 +116,7 @@ export default function CompetitionsPage() {
     description: '',
     rules: '',
     entryFee: '0',
+    bannerUrl: '',
     razorpayPlanId: '',
     razorpayProductId: '',
     startTime: '',
@@ -164,6 +166,7 @@ export default function CompetitionsPage() {
         description: competition.description,
         rules: competition.rules,
         entryFee: competition.entryFee.toString(),
+        bannerUrl: competition.bannerUrl || '',
         razorpayPlanId: competition.razorpayPlanId || '',
         razorpayProductId: competition.razorpayProductId || '',
         startTime: format(competition.startTime, "yyyy-MM-dd'T'HH:mm"),
@@ -180,6 +183,7 @@ export default function CompetitionsPage() {
         description: '',
         rules: '',
         entryFee: '0',
+        bannerUrl: '',
         razorpayPlanId: '',
         razorpayProductId: '',
         startTime: '',
@@ -217,6 +221,7 @@ export default function CompetitionsPage() {
         description: formData.description,
         rules: formData.rules,
         entryFee: parseFloat(formData.entryFee) || 0,
+        bannerUrl: formData.bannerUrl || null,
         razorpayPlanId: formData.razorpayPlanId || null,
         razorpayProductId: formData.razorpayProductId || null,
         startTime: Timestamp.fromDate(new Date(formData.startTime)),
@@ -751,6 +756,28 @@ export default function CompetitionsPage() {
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
                   placeholder="Competition rules and guidelines"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Banner Image URL</label>
+                <input
+                  type="text"
+                  value={formData.bannerUrl}
+                  onChange={(e) => setFormData({ ...formData, bannerUrl: e.target.value })}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
+                  placeholder="https://example.com/banner.jpg"
+                />
+                {formData.bannerUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={formData.bannerUrl}
+                      alt="Banner preview"
+                      className="h-32 w-full rounded-lg object-cover"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
+                <p className="mt-1 text-xs text-gray-500">Recommended size: 1200x400px. This will be displayed as the competition header.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
