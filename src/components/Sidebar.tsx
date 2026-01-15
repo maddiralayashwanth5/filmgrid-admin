@@ -25,6 +25,7 @@ import {
   Package,
   ChevronDown,
   ChevronRight,
+  Store,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -39,6 +40,7 @@ const navItems = [
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/dashboard/equipment-catalog', label: 'Equipment Catalog', icon: Package },
+  { href: '/dashboard/store-catalogue', label: 'Store Catalogue', icon: Store },
   { href: '/dashboard/equipment', label: 'Lender Equipment', icon: Camera },
   { href: '/dashboard/bookings', label: 'Bookings', icon: Calendar },
   { href: '/dashboard/orders', label: 'Open Orders', icon: Zap },
