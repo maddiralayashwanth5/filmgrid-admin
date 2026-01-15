@@ -21,7 +21,6 @@ export default function BannersPage() {
     title: '',
     subtitle: '',
     imageUrl: '',
-    linkUrl: '',
     isActive: true,
     order: 0,
   });
@@ -71,7 +70,6 @@ export default function BannersPage() {
       title: banner.title,
       subtitle: banner.subtitle,
       imageUrl: banner.imageUrl,
-      linkUrl: banner.linkUrl || '',
       isActive: banner.isActive,
       order: banner.order,
     });
@@ -130,7 +128,6 @@ export default function BannersPage() {
       title: '',
       subtitle: '',
       imageUrl: '',
-      linkUrl: '',
       isActive: true,
       order: 0,
     });
@@ -277,9 +274,6 @@ export default function BannersPage() {
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900">{banner.title}</h3>
                 <p className="text-xs text-gray-500">Image-only banner</p>
-                {banner.linkUrl && (
-                  <p className="mt-1 text-xs text-blue-600">{banner.linkUrl}</p>
-                )}
               </div>
 
               {/* Status */}
@@ -456,17 +450,7 @@ export default function BannersPage() {
                   <p className="mt-2 text-gray-600">Leave empty to use gradient background</p>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Link URL (Optional)</label>
-                <input
-                  type="url"
-                  value={formData.linkUrl}
-                  onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="https://..."
-                />
-              </div>
-              <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="isActive"

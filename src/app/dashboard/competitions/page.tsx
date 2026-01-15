@@ -731,13 +731,16 @@ export default function CompetitionsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Entry Fee (₹)</label>
-                  <input
-                    type="number"
+                  <select
                     value={formData.entryFee}
                     onChange={(e) => setFormData({ ...formData, entryFee: e.target.value })}
                     className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
-                    placeholder="0 for free"
-                  />
+                  >
+                    <option value="0">Free</option>
+                    <option value="50">₹50 - Basic</option>
+                    <option value="75">₹75 - Standard</option>
+                    <option value="99">₹99 - Premium</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Max Submissions per User</label>
@@ -750,38 +753,15 @@ export default function CompetitionsPage() {
                 </div>
               </div>
 
-              {/* Razorpay Payment Configuration */}
+              {/* Payment Info */}
               {parseFloat(formData.entryFee) > 0 && (
-                <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                  <h3 className="mb-3 flex items-center gap-2 font-medium text-blue-700">
-                    <IndianRupee className="h-4 w-4" /> Razorpay Payment Configuration
+                <div className="rounded-lg border-2 border-green-200 bg-green-50 p-4">
+                  <h3 className="mb-2 flex items-center gap-2 font-medium text-green-700">
+                    <IndianRupee className="h-4 w-4" /> Payment Configuration
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Razorpay Plan ID</label>
-                      <input
-                        type="text"
-                        value={formData.razorpayPlanId}
-                        onChange={(e) => setFormData({ ...formData, razorpayPlanId: e.target.value })}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
-                        placeholder="plan_xxxxxxxxxxxxx"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">From Razorpay Dashboard → Plans</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Razorpay Product ID</label>
-                      <input
-                        type="text"
-                        value={formData.razorpayProductId}
-                        onChange={(e) => setFormData({ ...formData, razorpayProductId: e.target.value })}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
-                        placeholder="prod_xxxxxxxxxxxxx"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">Optional - for one-time payments</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs text-blue-600">
-                    💡 Create a plan/product in Razorpay Dashboard with amount ₹{formData.entryFee} and paste the ID here.
+                  <p className="text-sm text-green-600">
+                    ✓ Payment links will be automatically generated via Razorpay when users register.
+                    Entry fee: <strong>₹{formData.entryFee}</strong>
                   </p>
                 </div>
               )}
