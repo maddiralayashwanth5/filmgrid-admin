@@ -279,7 +279,7 @@ export const approveRoleVerification = async (
     lender: 'Lender',
     worker: 'Crew',
     influencer: 'Influencer',
-    store: 'Store',
+    store: 'Shop',
   };
 
   // Handle store verification separately (stored in users collection)
@@ -294,8 +294,8 @@ export const approveRoleVerification = async (
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
       type: 'roleVerified',
-      title: 'Store Verification Approved! 🎉',
-      body: 'Your store verification has been approved. You can now sell on FilmGrid!',
+      title: 'Shop Verification Approved! 🎉',
+      body: 'Your shop verification has been approved. You can now sell on FilmGrid!',
       data: { verificationType: 'store' },
       isRead: false,
       createdAt: Timestamp.now(),
@@ -348,7 +348,7 @@ export const rejectRoleVerification = async (
     lender: 'Lender',
     worker: 'Crew',
     influencer: 'Influencer',
-    store: 'Store',
+    store: 'Shop',
   };
 
   // Handle store rejection separately (stored in users collection)
@@ -364,8 +364,8 @@ export const rejectRoleVerification = async (
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
       type: 'roleRejected',
-      title: 'Store Verification Not Approved',
-      body: `Your store verification was not approved. ${notes}`,
+      title: 'Shop Verification Not Approved',
+      body: `Your shop verification was not approved. ${notes}`,
       data: { verificationType: 'store' },
       isRead: false,
       createdAt: Timestamp.now(),
@@ -503,6 +503,129 @@ export const resetAllUsersVerification = async () => {
   
   await Promise.all(batch);
   return usersSnapshot.docs.length;
+};
+
+// ==================== DUPLICATE USER CLEANUP ====================
+
+export interface DuplicateUserGroup {
+  phone: string;
+  users: User[];
+  bestUserId: string;
+  duplicateCount: number;
+}
+
+// Find all duplicate users (same phone number)
+export const findDuplicateUsers = async (): Promise<DuplicateUserGroup[]> => {
+  const usersSnapshot = await getDocs(collection(db, 'users'));
+  
+  // Group users by normalized phone number
+  const phoneGroups: Record<string, { doc: any; data: any }[]> = {};
+  
+  usersSnapshot.docs.forEach((docSnap) => {
+    const data = docSnap.data();
+    const phone = (data.phone || data.phoneNumber || '').replace(/\D/g, '');
+    const last10 = phone.slice(-10);
+    
+    if (last10.length === 10) {
+      const normalizedPhone = `+91${last10}`;
+      if (!phoneGroups[normalizedPhone]) {
+        phoneGroups[normalizedPhone] = [];
+      }
+      phoneGroups[normalizedPhone].push({ doc: docSnap, data });
+    }
+  });
+  
+  // Filter to only groups with duplicates
+  const duplicateGroups: DuplicateUserGroup[] = [];
+  
+  for (const [phone, group] of Object.entries(phoneGroups)) {
+    if (group.length > 1) {
+      // Score each user to find the best one
+      let bestUser = group[0];
+      let bestScore = -1;
+      
+      for (const { doc: docSnap, data } of group) {
+        let score = 0;
+        if (data.displayName && data.displayName.trim().length > 0) score += 100;
+        if (data.termsAccepted === true) score += 50;
+        if (data.verificationStatus && data.verificationStatus !== 'notVerified') score += 25;
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestUser = { doc: docSnap, data };
+        }
+      }
+      
+      duplicateGroups.push({
+        phone,
+        users: group.map(({ doc: docSnap, data }) => normalizeUserData(docSnap.id, data)),
+        bestUserId: bestUser.doc.id,
+        duplicateCount: group.length,
+      });
+    }
+  }
+  
+  // Sort by duplicate count descending
+  duplicateGroups.sort((a, b) => b.duplicateCount - a.duplicateCount);
+  
+  return duplicateGroups;
+};
+
+// Clean up duplicates for a specific phone - keep best user, delete others
+export const cleanupDuplicateUsers = async (phone: string): Promise<number> => {
+  const usersSnapshot = await getDocs(collection(db, 'users'));
+  
+  // Find all users with this phone
+  const matchingUsers: { doc: any; data: any; score: number }[] = [];
+  const normalizedSearch = phone.replace(/\D/g, '').slice(-10);
+  
+  usersSnapshot.docs.forEach((docSnap) => {
+    const data = docSnap.data();
+    const userPhone = (data.phone || data.phoneNumber || '').replace(/\D/g, '');
+    const last10 = userPhone.slice(-10);
+    
+    if (last10 === normalizedSearch) {
+      let score = 0;
+      if (data.displayName && data.displayName.trim().length > 0) score += 100;
+      if (data.termsAccepted === true) score += 50;
+      if (data.verificationStatus && data.verificationStatus !== 'notVerified') score += 25;
+      
+      matchingUsers.push({ doc: docSnap, data, score });
+    }
+  });
+  
+  if (matchingUsers.length <= 1) {
+    return 0; // No duplicates
+  }
+  
+  // Sort by score descending - best user first
+  matchingUsers.sort((a, b) => b.score - a.score);
+  
+  // Delete all except the best user
+  const deletePromises: Promise<void>[] = [];
+  for (let i = 1; i < matchingUsers.length; i++) {
+    deletePromises.push(deleteDoc(doc(db, 'users', matchingUsers[i].doc.id)));
+  }
+  
+  await Promise.all(deletePromises);
+  return deletePromises.length;
+};
+
+// Clean up ALL duplicate users in the system
+export const cleanupAllDuplicateUsers = async (): Promise<{ groupsCleaned: number; usersDeleted: number }> => {
+  const duplicateGroups = await findDuplicateUsers();
+  
+  let totalDeleted = 0;
+  
+  for (const group of duplicateGroups) {
+    const deleted = await cleanupDuplicateUsers(group.phone);
+    totalDeleted += deleted;
+  }
+  
+  return {
+    groupsCleaned: duplicateGroups.length,
+    usersDeleted: totalDeleted,
+  };
 };
 
 // ==================== EQUIPMENT ====================

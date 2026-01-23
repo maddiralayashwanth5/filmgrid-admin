@@ -8,20 +8,16 @@ import {
   Calendar,
   Zap,
   ShieldCheck,
-  IndianRupee,
   TrendingUp,
   Clock,
   Instagram,
   MapPin,
   Video,
   Briefcase,
-  Radio,
-  UserCheck,
-  Clapperboard,
 } from 'lucide-react';
 import StatsCard from '@/components/StatsCard';
 import { getDashboardStats } from '@/lib/firestore';
-import { collection, getCountFromServer, query, where } from 'firebase/firestore';
+import { collection, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { DashboardStats } from '@/lib/types';
 
@@ -30,9 +26,7 @@ interface ExtendedStats extends DashboardStats {
   locations: number;
   videoPromotions: number;
   workers: number;
-  activeGearRequests: number;
-  activeRentalRequests: number;
-  activeWorkforceRequests: number;
+  totalJobs: number;
 }
 
 export default function DashboardPage() {
@@ -51,17 +45,13 @@ export default function DashboardPage() {
           locationsSnapshot,
           videoPromotionsSnapshot,
           workersSnapshot,
-          gearRequestsSnapshot,
-          rentalRequestsSnapshot,
-          workforceRequestsSnapshot,
+          jobsSnapshot,
         ] = await Promise.all([
           getCountFromServer(collection(db, 'influencer_profiles')),
           getCountFromServer(collection(db, 'lease_locations')),
           getCountFromServer(collection(db, 'video_promotions')),
           getCountFromServer(collection(db, 'worker_profiles')),
-          getCountFromServer(query(collection(db, 'broadcast_gear_requests'), where('status', '==', 'searching'))),
-          getCountFromServer(query(collection(db, 'broadcast_rental_requests'), where('status', '==', 'searching'))),
-          getCountFromServer(query(collection(db, 'broadcast_workforce_requests'), where('status', '==', 'searching'))),
+          getCountFromServer(collection(db, 'jobs')),
         ]);
 
         setStats({
@@ -70,9 +60,7 @@ export default function DashboardPage() {
           locations: locationsSnapshot.data().count,
           videoPromotions: videoPromotionsSnapshot.data().count,
           workers: workersSnapshot.data().count,
-          activeGearRequests: gearRequestsSnapshot.data().count,
-          activeRentalRequests: rentalRequestsSnapshot.data().count,
-          activeWorkforceRequests: workforceRequestsSnapshot.data().count,
+          totalJobs: jobsSnapshot.data().count,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -102,13 +90,13 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome to FilmGrid Super Admin Panel</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm sm:text-base text-gray-600">Welcome to FilmGrid Super Admin Panel</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         <div onClick={() => router.push('/dashboard/verification')} className="cursor-pointer">
           <StatsCard
             title="Total Users"
@@ -133,16 +121,18 @@ export default function DashboardPage() {
             color="orange"
           />
         </div>
-        <StatsCard
-          title="Total Revenue"
-          value={formatCurrency(stats?.totalRevenue || 0)}
-          icon={IndianRupee}
-          color="teal"
-        />
+        <div onClick={() => router.push('/dashboard/verification')} className="cursor-pointer">
+          <StatsCard
+            title="Pending Profiles"
+            value={stats?.pendingProfiles || 0}
+            icon={ShieldCheck}
+            color="red"
+          />
+        </div>
       </div>
 
       {/* Second Row */}
-      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         <div onClick={() => router.push('/dashboard/bookings')} className="cursor-pointer">
           <StatsCard
             title="Active Bookings"
@@ -167,18 +157,18 @@ export default function DashboardPage() {
             color="red"
           />
         </div>
-        <div onClick={() => router.push('/dashboard/verification')} className="cursor-pointer">
+        <div onClick={() => router.push('/dashboard/workforce')} className="cursor-pointer">
           <StatsCard
-            title="Pending Profiles"
-            value={stats?.pendingProfiles || 0}
-            icon={ShieldCheck}
-            color="red"
+            title="Workers"
+            value={stats?.workers || 0}
+            icon={Briefcase}
+            color="orange"
           />
         </div>
       </div>
 
-      {/* Third Row - New Features */}
-      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* Third Row */}
+      <div className="mb-6 grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         <div onClick={() => router.push('/dashboard/influencers')} className="cursor-pointer">
           <StatsCard
             title="Influencers"
@@ -203,132 +193,13 @@ export default function DashboardPage() {
             color="purple"
           />
         </div>
-        <div onClick={() => router.push('/dashboard/workforce')} className="cursor-pointer">
+        <div onClick={() => router.push('/dashboard/jobs')} className="cursor-pointer">
           <StatsCard
-            title="Workers"
-            value={stats?.workers || 0}
+            title="Jobs"
+            value={stats?.totalJobs || 0}
             icon={Briefcase}
-            color="orange"
+            color="blue"
           />
-        </div>
-      </div>
-
-      {/* Fourth Row - Active Broadcast Requests */}
-      <div className="mb-8 grid gap-6 md:grid-cols-3">
-        <div 
-          onClick={() => router.push('/dashboard/requests?type=gear')} 
-          className="cursor-pointer rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-purple-100 p-3">
-              <Radio className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Active Gear Requests</p>
-              <p className="text-2xl font-bold text-purple-700">
-                {stats?.activeGearRequests || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div 
-          onClick={() => router.push('/dashboard/requests?type=rental')} 
-          className="cursor-pointer rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-blue-100 p-3">
-              <Radio className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Active Rental Requests</p>
-              <p className="text-2xl font-bold text-blue-700">
-                {stats?.activeRentalRequests || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div 
-          onClick={() => router.push('/dashboard/requests?type=workforce')} 
-          className="cursor-pointer rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-orange-100 p-3">
-              <Radio className="h-6 w-6 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Active Workforce Requests</p>
-              <p className="text-2xl font-bold text-orange-700">
-                {stats?.activeWorkforceRequests || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Users by Role */}
-      <div className="rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Users by Role</h2>
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <div 
-            onClick={() => router.push('/dashboard/verification?role=renter')} 
-            className="cursor-pointer rounded-lg bg-green-50 p-4 transition-all hover:bg-green-100 hover:shadow-md"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-green-600" />
-              <p className="text-sm text-green-600">Renters</p>
-            </div>
-            <p className="text-2xl font-bold text-green-700">
-              {stats?.usersByRole.renters || 0}
-            </p>
-          </div>
-          <div 
-            onClick={() => router.push('/dashboard/verification?role=lender')} 
-            className="cursor-pointer rounded-lg bg-blue-50 p-4 transition-all hover:bg-blue-100 hover:shadow-md"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Camera className="h-4 w-4 text-blue-600" />
-              <p className="text-sm text-blue-600">Lenders</p>
-            </div>
-            <p className="text-2xl font-bold text-blue-700">
-              {stats?.usersByRole.lenders || 0}
-            </p>
-          </div>
-          <div 
-            onClick={() => router.push('/dashboard/workforce')} 
-            className="cursor-pointer rounded-lg bg-orange-50 p-4 transition-all hover:bg-orange-100 hover:shadow-md"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Briefcase className="h-4 w-4 text-orange-600" />
-              <p className="text-sm text-orange-600">Workers</p>
-            </div>
-            <p className="text-2xl font-bold text-orange-700">
-              {stats?.usersByRole.workers || 0}
-            </p>
-          </div>
-          <div 
-            onClick={() => router.push('/dashboard/influencers')} 
-            className="cursor-pointer rounded-lg bg-pink-50 p-4 transition-all hover:bg-pink-100 hover:shadow-md"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Instagram className="h-4 w-4 text-pink-600" />
-              <p className="text-sm text-pink-600">Influencers</p>
-            </div>
-            <p className="text-2xl font-bold text-pink-700">
-              {stats?.usersByRole.influencers || 0}
-            </p>
-          </div>
-          <div 
-            onClick={() => router.push('/dashboard/verification?role=user')} 
-            className="cursor-pointer rounded-lg bg-gray-50 p-4 transition-all hover:bg-gray-100 hover:shadow-md"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <UserCheck className="h-4 w-4 text-gray-600" />
-              <p className="text-sm text-gray-600">Default Users</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-700">
-              {stats?.usersByRole.users || 0}
-            </p>
-          </div>
         </div>
       </div>
     </div>

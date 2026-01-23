@@ -31,7 +31,7 @@ const roleConfig: Record<RoleVerificationType, { name: string; icon: typeof Film
   lender: { name: 'Lender', icon: Camera, color: 'green' },
   worker: { name: 'Crew', icon: Briefcase, color: 'orange' },
   influencer: { name: 'Influencer', icon: Star, color: 'pink' },
-  store: { name: 'Store', icon: Store, color: 'emerald' },
+  store: { name: 'Shop', icon: Store, color: 'emerald' },
 };
 
 export default function VerificationPage() {
@@ -249,7 +249,7 @@ export default function VerificationPage() {
               {/* Store Specific Info */}
               {roleFilter === 'store' && (
                 <div className="mb-4 rounded-lg bg-emerald-50 p-3">
-                  <p className="text-xs font-medium text-gray-500 mb-1">Store Details</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Shop Details</p>
                   <p className="text-sm font-medium">{request.storeName}</p>
                   {request.gstin && (
                     <p className="text-xs text-gray-600">GSTIN: {request.gstin}</p>
@@ -263,7 +263,7 @@ export default function VerificationPage() {
                     >
                       <img
                         src={request.storeImageUrl}
-                        alt="Store"
+                        alt="Shop"
                         className="h-24 w-full object-cover transition-transform hover:scale-105"
                       />
                     </div>

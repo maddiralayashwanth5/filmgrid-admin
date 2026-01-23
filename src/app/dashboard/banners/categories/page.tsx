@@ -24,7 +24,7 @@ const categorySizes: CategorySize[] = [
     width: 200,
     height: 200,
     ratio: '1:1',
-    description: 'Icons for Director, Cinematographer, Gaffer, Editor, etc.',
+    description: 'Icons for Director, DOP, Gaffer, Editor, etc.',
   },
   {
     name: 'Service Grid Icons',
@@ -172,7 +172,7 @@ export default function CategoryBannersPage() {
               </div>
               <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <code className="bg-gray-200 px-2 py-1 rounded text-xs">assets/icons/crew/</code>
-                <span className="text-gray-600">Crew role icons (director.png, cinematographer.png, etc.)</span>
+                <span className="text-gray-600">Crew role icons (director.png, dop.png, etc.)</span>
               </div>
             </div>
           </div>

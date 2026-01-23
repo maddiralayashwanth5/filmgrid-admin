@@ -37,19 +37,19 @@ const iconBgClasses = {
 
 export default function StatsCard({ title, value, icon: Icon, color, trend }: StatsCardProps) {
   return (
-    <div className={`rounded-xl border p-6 ${colorClasses[color]}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="mt-2 text-3xl font-bold">{value}</p>
+    <div className={`rounded-xl border p-3 sm:p-4 lg:p-6 ${colorClasses[color]}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{title}</p>
+          <p className="mt-1 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-bold">{value}</p>
           {trend && (
-            <p className={`mt-1 text-sm ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-              {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}% from last month
+            <p className={`mt-1 text-xs sm:text-sm ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+              {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
             </p>
           )}
         </div>
-        <div className={`rounded-full p-3 ${iconBgClasses[color]}`}>
-          <Icon className="h-6 w-6" />
+        <div className={`rounded-full p-2 sm:p-3 flex-shrink-0 ${iconBgClasses[color]}`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
         </div>
       </div>
     </div>

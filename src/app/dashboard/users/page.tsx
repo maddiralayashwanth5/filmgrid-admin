@@ -15,8 +15,9 @@ import {
   Users,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification } from '@/lib/firestore';
+import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification, findDuplicateUsers, cleanupDuplicateUsers, cleanupAllDuplicateUsers, type DuplicateUserGroup } from '@/lib/firestore';
 import type { User, ContactInfo } from '@/lib/types';
+import { Copy, Trash2, AlertTriangle } from 'lucide-react';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -32,6 +33,11 @@ export default function UsersPage() {
   const [resetting, setResetting] = useState(false);
   const [showRoleVerificationModal, setShowRoleVerificationModal] = useState<User | null>(null);
   const [roleVerifications, setRoleVerifications] = useState<Record<string, boolean>>({});
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateUserGroup[]>([]);
+  const [loadingDuplicates, setLoadingDuplicates] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState<string | null>(null);
+  const [cleaningUpAll, setCleaningUpAll] = useState(false);
   const pageSize = 15;
 
   useEffect(() => {
@@ -129,6 +135,51 @@ export default function UsersPage() {
       alert('Failed to reset verifications');
     }
     setResetting(false);
+  };
+
+  const handleOpenDuplicatesModal = async () => {
+    setShowDuplicatesModal(true);
+    setLoadingDuplicates(true);
+    try {
+      const groups = await findDuplicateUsers();
+      setDuplicateGroups(groups);
+    } catch (error) {
+      console.error('Error finding duplicates:', error);
+      alert('Failed to find duplicate users');
+    }
+    setLoadingDuplicates(false);
+  };
+
+  const handleCleanupDuplicate = async (phone: string) => {
+    setCleaningUp(phone);
+    try {
+      const deleted = await cleanupDuplicateUsers(phone);
+      alert(`Deleted ${deleted} duplicate user(s) for ${phone}`);
+      // Refresh the list
+      const groups = await findDuplicateUsers();
+      setDuplicateGroups(groups);
+    } catch (error) {
+      console.error('Error cleaning up duplicates:', error);
+      alert('Failed to clean up duplicates');
+    }
+    setCleaningUp(null);
+  };
+
+  const handleCleanupAllDuplicates = async () => {
+    if (!confirm('Are you sure you want to clean up ALL duplicate users? This will keep the best profile for each phone number and delete the rest.')) {
+      return;
+    }
+    setCleaningUpAll(true);
+    try {
+      const result = await cleanupAllDuplicateUsers();
+      alert(`Cleaned up ${result.groupsCleaned} duplicate groups, deleted ${result.usersDeleted} users`);
+      setDuplicateGroups([]);
+      setShowDuplicatesModal(false);
+    } catch (error) {
+      console.error('Error cleaning up all duplicates:', error);
+      alert('Failed to clean up duplicates');
+    }
+    setCleaningUpAll(false);
   };
 
   const getRoleBadge = (role: string | undefined) => {
@@ -381,12 +432,21 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage all users on the platform</p>
         </div>
-        <button
-          onClick={() => setShowResetAllModal(true)}
-          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-        >
-          Reset All Verifications
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleOpenDuplicatesModal}
+            className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+          >
+            <Copy className="h-4 w-4" />
+            Find Duplicates
+          </button>
+          <button
+            onClick={() => setShowResetAllModal(true)}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Reset All Verifications
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -834,6 +894,136 @@ export default function UsersPage() {
               >
                 Verify All
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Users Modal */}
+      {showDuplicatesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b p-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-6 w-6 text-orange-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Duplicate Users</h3>
+                  <p className="text-sm text-gray-500">
+                    {loadingDuplicates ? 'Scanning...' : `Found ${duplicateGroups.length} phone numbers with duplicate accounts`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDuplicatesModal(false)}
+                className="rounded-full p-1 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {loadingDuplicates ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-600 border-t-transparent"></div>
+                </div>
+              ) : duplicateGroups.length === 0 ? (
+                <div className="py-12 text-center">
+                  <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+                  <p className="mt-4 text-lg font-medium text-gray-900">No Duplicates Found</p>
+                  <p className="text-gray-500">All users have unique phone numbers.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {duplicateGroups.map((group) => (
+                    <div key={group.phone} className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-orange-600" />
+                          <span className="font-medium text-gray-900">{group.phone}</span>
+                          <span className="rounded-full bg-orange-200 px-2 py-0.5 text-xs font-medium text-orange-800">
+                            {group.duplicateCount} accounts
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleCleanupDuplicate(group.phone)}
+                          disabled={cleaningUp === group.phone}
+                          className="flex items-center gap-1 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {cleaningUp === group.phone ? 'Cleaning...' : 'Clean Up'}
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {group.users.map((user) => (
+                          <div
+                            key={user.uid}
+                            className={`flex items-center justify-between rounded-lg p-2 ${
+                              user.uid === group.bestUserId
+                                ? 'border-2 border-green-500 bg-green-50'
+                                : 'bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium">
+                                {user.displayName?.[0]?.toUpperCase() || '?'}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {user.displayName || <span className="italic text-gray-400">No name</span>}
+                                </p>
+                                <p className="text-xs text-gray-500">ID: {user.uid.slice(0, 12)}...</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {user.uid === group.bestUserId && (
+                                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                  Keep
+                                </span>
+                              )}
+                              {user.uid !== group.bestUserId && (
+                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                                  Delete
+                                </span>
+                              )}
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                user.verificationStatus === 'verified'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {user.verificationStatus || 'notVerified'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t p-4">
+              <p className="text-sm text-gray-500">
+                Cleanup keeps the best profile (with name, terms accepted, verified) and deletes others.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDuplicatesModal(false)}
+                  className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                {duplicateGroups.length > 0 && (
+                  <button
+                    onClick={handleCleanupAllDuplicates}
+                    disabled={cleaningUpAll}
+                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {cleaningUpAll ? 'Cleaning All...' : 'Clean Up All'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

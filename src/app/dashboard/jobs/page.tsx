@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   Briefcase,
@@ -20,6 +20,9 @@ import {
   Save,
   Users,
   Calendar,
+  Upload,
+  Loader2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   collection,
@@ -32,7 +35,8 @@ import {
   addDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface Job {
   id: string;
@@ -57,11 +61,13 @@ interface Job {
   isLiveJob: boolean;
   applicationsCount: number;
   createdAt: Date;
+  imageUrl?: string;
+  bannerUrl?: string;
 }
 
 const JOB_CATEGORIES = [
   'Director',
-  'Cinematographer',
+  'DOP',
   'Editor',
   'Sound Engineer',
   'Production Assistant',
@@ -91,6 +97,8 @@ export default function JobsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const pageSize = 15;
 
   const [formData, setFormData] = useState({
@@ -111,6 +119,7 @@ export default function JobsPage() {
     posterName: 'FilmGrid',
     isLiveJob: true,
     sendNotification: true,
+    imageUrl: '',
   });
 
   useEffect(() => {
@@ -185,6 +194,7 @@ export default function JobsPage() {
         posterName: job.posterName || 'FilmGrid',
         isLiveJob: job.isLiveJob ?? true,
         sendNotification: false,
+        imageUrl: job.imageUrl || '',
       });
     } else {
       setEditingJob(null);
@@ -206,9 +216,39 @@ export default function JobsPage() {
         posterName: 'FilmGrid',
         isLiveJob: true,
         sendNotification: true,
+        imageUrl: '',
       });
     }
     setShowForm(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const fileName = `job_images/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      setFormData({ ...formData, imageUrl: downloadUrl });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSaveJob = async () => {
@@ -252,6 +292,8 @@ export default function JobsPage() {
         viewCount: 0,
         unlockCount: 0,
         creditsRequired: 1,
+        imageUrl: formData.imageUrl || null,
+        bannerUrl: formData.imageUrl || null,
         updatedAt: Timestamp.now(),
       };
 
@@ -401,9 +443,6 @@ export default function JobsPage() {
                 Job
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Location
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -423,7 +462,7 @@ export default function JobsPage() {
           <tbody className="divide-y divide-gray-200">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                   No jobs found
                 </td>
               </tr>
@@ -440,15 +479,10 @@ export default function JobsPage() {
                         <Briefcase className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{job.title}</p>
+                        <p className="text-base font-semibold text-gray-900">{job.title}</p>
                         <p className="text-xs text-gray-500">{job.posterName}</p>
                       </div>
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium">
-                      {job.category}
-                    </span>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center gap-1 text-gray-600">
@@ -606,7 +640,7 @@ export default function JobsPage() {
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="e.g., Senior Cinematographer"
+                  placeholder="e.g., Senior DOP"
                 />
               </div>
 
@@ -774,6 +808,65 @@ export default function JobsPage() {
                 />
               </div>
 
+              {/* Job Image/Banner */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Job Image/Banner</label>
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                {formData.imageUrl ? (
+                  <div className="mt-2 relative">
+                    <img
+                      src={formData.imageUrl}
+                      alt="Job image preview"
+                      className="h-40 w-full rounded-lg object-cover"
+                    />
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        title="Change image"
+                      >
+                        <Edit className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                        className="rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        title="Remove image"
+                      >
+                        <X className="h-4 w-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-8 text-gray-500 hover:border-blue-500 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6" />
+                        <span>Click to upload job image</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <p className="mt-1 text-xs text-gray-500">Recommended size: 1200x400px. Max 5MB. This will be displayed as the job banner in the app.</p>
+              </div>
+
               {/* Live Job Settings */}
               <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-4">
                 <h3 className="mb-3 flex items-center gap-2 font-medium text-orange-700">
@@ -857,15 +950,12 @@ export default function JobsPage() {
             </div>
 
             <div className="mb-4">
-              <h3 className="text-lg font-semibold">{selectedJob.title}</h3>
+              <h3 className="text-xl font-bold">{selectedJob.title}</h3>
               <p className="text-sm text-gray-500">Posted by {selectedJob.posterName}</p>
             </div>
 
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700">
-                  {selectedJob.category}
-                </span>
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
                   {selectedJob.jobType}
                 </span>
