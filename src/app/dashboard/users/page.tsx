@@ -15,7 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification, findDuplicateUsers, cleanupDuplicateUsers, cleanupAllDuplicateUsers, type DuplicateUserGroup } from '@/lib/firestore';
+import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification, findDuplicateUsers, cleanupDuplicateUsers, cleanupAllDuplicateUsers, getRoleVerifications, approveRoleVerification, rejectRoleVerification, type DuplicateUserGroup, type RoleVerificationRequest, type RoleVerificationType } from '@/lib/firestore';
 import type { User, ContactInfo } from '@/lib/types';
 import { Copy, Trash2, AlertTriangle } from 'lucide-react';
 
@@ -38,6 +38,10 @@ export default function UsersPage() {
   const [loadingDuplicates, setLoadingDuplicates] = useState(false);
   const [cleaningUp, setCleaningUp] = useState<string | null>(null);
   const [cleaningUpAll, setCleaningUpAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'filmmaker' | 'lender' | 'worker' | 'influencer' | 'store'>('users');
+  const [roleRequests, setRoleRequests] = useState<RoleVerificationRequest[]>([]);
+  const [loadingRoleRequests, setLoadingRoleRequests] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const pageSize = 15;
 
   useEffect(() => {
@@ -47,6 +51,21 @@ export default function UsersPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Fetch role verification requests when tab changes
+  useEffect(() => {
+    if (activeTab === 'users') {
+      setRoleRequests([]);
+      return;
+    }
+    
+    setLoadingRoleRequests(true);
+    const unsubscribe = getRoleVerifications(activeTab as RoleVerificationType, 'pending', (requests) => {
+      setRoleRequests(requests);
+      setLoadingRoleRequests(false);
+    });
+    return () => unsubscribe();
+  }, [activeTab]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
@@ -180,6 +199,29 @@ export default function UsersPage() {
       alert('Failed to clean up duplicates');
     }
     setCleaningUpAll(false);
+  };
+
+  const handleApproveRoleRequest = async (request: RoleVerificationRequest) => {
+    setProcessingRequest(request.id);
+    try {
+      await approveRoleVerification(request, 'admin');
+    } catch (error) {
+      console.error('Error approving role verification:', error);
+      alert('Failed to approve verification');
+    }
+    setProcessingRequest(null);
+  };
+
+  const handleRejectRoleRequest = async (request: RoleVerificationRequest) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    setProcessingRequest(request.id);
+    try {
+      await rejectRoleVerification(request, 'admin', reason || 'Verification rejected');
+    } catch (error) {
+      console.error('Error rejecting role verification:', error);
+      alert('Failed to reject verification');
+    }
+    setProcessingRequest(null);
   };
 
   const getRoleBadge = (role: string | undefined) => {
@@ -427,33 +469,104 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600">Manage all users on the platform</p>
+          <h1 className="text-2xl font-bold text-gray-900">Users & Verification</h1>
+          <p className="text-gray-600">Manage users and role verification requests</p>
         </div>
-        <div className="flex gap-3">
+        {activeTab === 'users' && (
+          <div className="flex gap-3">
+            <button
+              onClick={handleOpenDuplicatesModal}
+              className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+            >
+              <Copy className="h-4 w-4" />
+              Find Duplicates
+            </button>
+            <button
+              onClick={() => setShowResetAllModal(true)}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Reset All Verifications
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Tabs */}
+      <div className="mb-6 border-b">
+        <div className="flex gap-1">
           <button
-            onClick={handleOpenDuplicatesModal}
-            className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+            onClick={() => { setActiveTab('users'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'users'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <Copy className="h-4 w-4" />
-            Find Duplicates
+            All Users
           </button>
           <button
-            onClick={() => setShowResetAllModal(true)}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            onClick={() => { setActiveTab('filmmaker'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'filmmaker'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            Reset All Verifications
+            Filmmaker Requests
+          </button>
+          <button
+            onClick={() => { setActiveTab('lender'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'lender'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Lender Requests
+          </button>
+          <button
+            onClick={() => { setActiveTab('worker'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'worker'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Crew Requests
+          </button>
+          <button
+            onClick={() => { setActiveTab('influencer'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'influencer'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Influencer Requests
+          </button>
+          <button
+            onClick={() => { setActiveTab('store'); setCurrentPage(1); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'store'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Store Requests
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        {/* Search */}
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      {/* Users Tab Content */}
+      {activeTab === 'users' && (
+        <>
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-4">
+            {/* Search */}
+            <div className="relative max-w-md flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search users by name..."
@@ -605,6 +718,100 @@ export default function UsersPage() {
           );
         })()}
       </div>
+        </>
+      )}
+
+      {/* Role Verification Tab Content */}
+      {activeTab !== 'users' && (
+        <div className="rounded-lg border bg-white shadow-sm">
+          {loadingRoleRequests ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            </div>
+          ) : roleRequests.length === 0 ? (
+            <div className="py-12 text-center">
+              <Shield className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-4 text-lg font-medium text-gray-900">No Pending Requests</p>
+              <p className="text-gray-500">There are no pending {activeTab} verification requests.</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {roleRequests.map((request) => (
+                <div key={request.id} className="p-4 hover:bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-600">
+                        {request.displayName?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{request.displayName || 'Unknown User'}</p>
+                        <p className="text-sm text-gray-500">{request.phone}</p>
+                        <p className="text-xs text-gray-400">
+                          Submitted: {request.submittedAt ? format(request.submittedAt, 'MMM d, yyyy h:mm a') : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {request.documentUrl && (
+                        <a
+                          href={request.documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                        >
+                          <Eye className="h-4 w-4" /> View Doc
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleApproveRoleRequest(request)}
+                        disabled={processingRequest === request.id}
+                        className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                      >
+                        <CheckCircle className="h-4 w-4" /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectRoleRequest(request)}
+                        disabled={processingRequest === request.id}
+                        className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <XCircle className="h-4 w-4" /> Reject
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Additional info for specific roles */}
+                  {request.role === 'store' && request.storeName && (
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-700">Store Details</p>
+                      <p className="text-sm text-gray-600">Name: {request.storeName}</p>
+                      {request.storeAddress && <p className="text-sm text-gray-600">Address: {request.storeAddress}</p>}
+                      {request.storeContact && <p className="text-sm text-gray-600">Contact: {request.storeContact}</p>}
+                    </div>
+                  )}
+                  
+                  {request.role === 'worker' && (request.unionId || request.bio) && (
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-700">Worker Details</p>
+                      {request.unionId && <p className="text-sm text-gray-600">Union ID: {request.unionId}</p>}
+                      {request.bio && <p className="text-sm text-gray-600">Bio: {request.bio}</p>}
+                      {request.unionCardUrl && (
+                        <a
+                          href={request.unionCardUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                        >
+                          <Eye className="h-4 w-4" /> View Union Card
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* User Details Modal */}
       {showDetailsModal && (

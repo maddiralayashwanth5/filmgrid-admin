@@ -9,7 +9,6 @@ import {
   Camera,
   Calendar,
   Zap,
-  ShieldCheck,
   LogOut,
   Settings,
   Instagram,
@@ -52,8 +51,7 @@ const sidebarCategories: NavCategory[] = [
     label: 'Users',
     icon: Users,
     items: [
-      { href: '/dashboard/users', label: 'Total Users', icon: Users },
-      { href: '/dashboard/verification', label: 'Pending Profiles', icon: ShieldCheck },
+      { href: '/dashboard/users', label: 'Users & Verification', icon: Users },
     ],
   },
   {
