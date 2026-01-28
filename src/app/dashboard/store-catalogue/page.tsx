@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import {
   Store,
@@ -22,6 +23,9 @@ import {
   Phone,
   User,
   Image as ImageIcon,
+  Upload,
+  Loader2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   collection,
@@ -75,6 +79,7 @@ const EQUIPMENT_CATEGORIES = [
   'Drones',
   'Storage',
   'Accessories',
+  'Sales',
 ];
 
 const NON_EQUIPMENT_CATEGORIES = [
@@ -109,6 +114,23 @@ export default function StoreCataloguePage() {
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<StoreItem | null>(null);
   const [saving, setSaving] = useState(false);
+  
+  // Excel upload state
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [excelData, setExcelData] = useState<Array<{
+    title: string;
+    description: string;
+    category: string;
+    itemType: ItemType;
+    price: number;
+    condition: string;
+    location: string;
+    sellerName: string;
+    sellerPhone: string;
+  }>>([]);
+  const [isUploadingExcel, setIsUploadingExcel] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -318,6 +340,158 @@ export default function StoreCataloguePage() {
     }
   };
 
+  // Excel upload handling
+  const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        const mappedData = jsonData.map((row: any) => {
+          const itemType = mapItemType(row['Type'] || row['Item Type'] || row['itemType'] || 'equipment');
+          return {
+            title: row['Title'] || row['title'] || row['Name'] || row['name'] || '',
+            description: row['Description'] || row['description'] || '',
+            category: mapStoreCategory(row['Category'] || row['category'] || '', itemType),
+            itemType,
+            price: Number(row['Price'] || row['price'] || 0),
+            condition: row['Condition'] || row['condition'] || 'Good',
+            location: row['Location'] || row['location'] || '',
+            sellerName: row['Seller Name'] || row['sellerName'] || row['Seller'] || '',
+            sellerPhone: row['Seller Phone'] || row['sellerPhone'] || row['Phone'] || '',
+          };
+        });
+
+        const validData = mappedData.filter((item) => item.title && item.category && item.price > 0);
+        setExcelData(validData);
+        setShowExcelModal(true);
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        alert('Failed to parse Excel file. Please check the format.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    
+    if (excelInputRef.current) {
+      excelInputRef.current.value = '';
+    }
+  };
+
+  const mapItemType = (type: string): ItemType => {
+    const normalized = type.toLowerCase().trim();
+    if (normalized.includes('non') || normalized.includes('consumable') || normalized.includes('material')) {
+      return 'non-equipment';
+    }
+    return 'equipment';
+  };
+
+  const mapStoreCategory = (category: string, itemType: ItemType): string => {
+    const normalized = category.toLowerCase().trim();
+    
+    if (itemType === 'equipment') {
+      const equipmentMap: Record<string, string> = {
+        'used': 'Used Equipment',
+        'used equipment': 'Used Equipment',
+        'camera': 'Cameras',
+        'cameras': 'Cameras',
+        'lens': 'Lenses',
+        'lenses': 'Lenses',
+        'light': 'Lighting',
+        'lighting': 'Lighting',
+        'audio': 'Audio',
+        'sound': 'Audio',
+        'grip': 'Grip',
+        'drone': 'Drones',
+        'drones': 'Drones',
+        'storage': 'Storage',
+        'accessory': 'Accessories',
+        'accessories': 'Accessories',
+        'sale': 'Sales',
+        'sales': 'Sales',
+      };
+      return equipmentMap[normalized] || EQUIPMENT_CATEGORIES.find(c => c.toLowerCase() === normalized) || category;
+    } else {
+      const nonEquipmentMap: Record<string, string> = {
+        'gel': 'Gels & Filters',
+        'gels': 'Gels & Filters',
+        'filter': 'Gels & Filters',
+        'filters': 'Gels & Filters',
+        'cable': 'Cables & Electrical',
+        'cables': 'Cables & Electrical',
+        'electrical': 'Cables & Electrical',
+        'bulb': 'Bulbs & Lamps',
+        'bulbs': 'Bulbs & Lamps',
+        'lamp': 'Bulbs & Lamps',
+        'lamps': 'Bulbs & Lamps',
+        'diffusion': 'Diffusion Materials',
+        'consumable': 'Consumables',
+        'consumables': 'Consumables',
+        'prop': 'Props',
+        'props': 'Props',
+        'costume': 'Costumes',
+        'costumes': 'Costumes',
+        'other': 'Other',
+      };
+      return nonEquipmentMap[normalized] || NON_EQUIPMENT_CATEGORIES.find(c => c.toLowerCase() === normalized) || category;
+    }
+  };
+
+  const handleExcelUpload = async () => {
+    if (excelData.length === 0) return;
+
+    setIsUploadingExcel(true);
+    setUploadProgress({ current: 0, total: excelData.length });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < excelData.length; i++) {
+      try {
+        await addDoc(collection(db, 'sales_items'), {
+          ...excelData[i],
+          sellerId: user?.uid || 'admin',
+          status: 'approved',
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        successCount++;
+      } catch (error) {
+        console.error(`Error creating item ${excelData[i].title}:`, error);
+        failCount++;
+      }
+      setUploadProgress({ current: i + 1, total: excelData.length });
+    }
+
+    setIsUploadingExcel(false);
+    setShowExcelModal(false);
+    setExcelData([]);
+    
+    alert(`Upload complete!\n✓ ${successCount} items created\n✗ ${failCount} failed`);
+  };
+
+  const removeExcelItem = (index: number) => {
+    setExcelData((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const downloadStoreTemplate = () => {
+    const template = [
+      { Title: 'Sony FX3 (Used)', Type: 'Equipment', Category: 'Cameras', Description: 'Full-frame cinema camera in excellent condition', Price: 250000, Condition: 'Like New', Location: 'Mumbai', 'Seller Name': 'John Doe', 'Seller Phone': '+919876543210' },
+      { Title: 'Canon RF 24-70mm f/2.8', Type: 'Equipment', Category: 'Lenses', Description: 'Professional zoom lens', Price: 150000, Condition: 'Good', Location: 'Delhi', 'Seller Name': 'Jane Smith', 'Seller Phone': '+919876543211' },
+      { Title: 'Lee Filters Set', Type: 'Non-Equipment', Category: 'Gels & Filters', Description: 'Complete gel filter set', Price: 5000, Condition: 'New', Location: 'Bangalore', 'Seller Name': 'Mike Wilson', 'Seller Phone': '+919876543212' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Store Items');
+    XLSX.writeFile(wb, 'store_catalogue_template.xlsx');
+  };
+
   // Filter items
   const filteredItems = items.filter((item) => {
     const matchesSearch = 
@@ -354,13 +528,29 @@ export default function StoreCataloguePage() {
           <h1 className="text-2xl font-bold text-gray-900">Store Catalogue</h1>
           <p className="text-gray-500">Manage sales items - equipment and non-equipment</p>
         </div>
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Item
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => excelInputRef.current?.click()}
+            className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import Excel
+          </button>
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleExcelFileSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => handleOpenForm()}
+            className="flex items-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Item
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -918,6 +1108,141 @@ export default function StoreCataloguePage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Import Modal */}
+      {showExcelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !isUploadingExcel && setShowExcelModal(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl bg-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Import Store Items from Excel</h2>
+                <p className="text-sm text-gray-500">
+                  {excelData.length} items ready to import
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadStoreTemplate}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Download Template
+                </button>
+                <button
+                  onClick={() => setShowExcelModal(false)}
+                  disabled={isUploadingExcel}
+                  className="rounded-lg p-2 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[60vh] overflow-auto p-4">
+              {excelData.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                  No valid items found. Please check your Excel file format.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Title</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Type</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Category</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Price</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Condition</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Seller</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {excelData.map((item, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium text-gray-900">{item.title}</td>
+                        <td className="px-3 py-2">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            item.itemType === 'equipment' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {item.itemType === 'equipment' ? 'Equipment' : 'Non-Equipment'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{item.category}</td>
+                        <td className="px-3 py-2 text-green-600 font-medium">₹{item.price.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.condition}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.sellerName || '-'}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => removeExcelItem(index)}
+                            disabled={isUploadingExcel}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {isUploadingExcel && (
+              <div className="border-t px-4 py-3">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Uploading...</span>
+                  <span className="font-medium text-green-600">
+                    {uploadProgress.current} / {uploadProgress.total}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="h-full bg-green-600 transition-all duration-300"
+                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between border-t p-4">
+              <p className="text-xs text-gray-500">
+                Required: Title, Category, Price. Optional: Type, Description, Condition, Location, Seller info
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowExcelModal(false)}
+                  disabled={isUploadingExcel}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExcelUpload}
+                  disabled={isUploadingExcel || excelData.length === 0}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isUploadingExcel ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Import {excelData.length} Items
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
