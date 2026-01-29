@@ -455,8 +455,19 @@ export default function StoreCataloguePage() {
     for (let i = 0; i < excelData.length; i++) {
       try {
         await addDoc(collection(db, 'sales_items'), {
-          ...excelData[i],
+          title: excelData[i].title,
+          name: excelData[i].title, // Flutter app may use 'name' field
+          description: excelData[i].description || '',
+          category: excelData[i].category,
+          itemType: excelData[i].itemType,
+          price: excelData[i].price,
+          condition: excelData[i].condition || 'Good',
+          location: excelData[i].location || '',
+          sellerName: excelData[i].sellerName || '',
+          sellerPhone: excelData[i].sellerPhone || '',
           sellerId: user?.uid || 'admin',
+          imageUrl: '',
+          images: [], // Empty array for images to be added later
           status: 'approved',
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
