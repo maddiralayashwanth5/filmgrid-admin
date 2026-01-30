@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 import {
   Users,
   Briefcase,
@@ -17,6 +18,7 @@ import {
   X,
   IndianRupee,
   Phone,
+  Download,
 } from 'lucide-react';
 import {
   collection,
@@ -213,6 +215,53 @@ export default function WorkforcePage() {
     return matchesSearch && matchesCategory;
   });
 
+  const exportWorkersToExcel = () => {
+    const exportData = workers.map(worker => ({
+      'Name': worker.name || '',
+      'Phone': worker.phone || '',
+      'Category': worker.category || '',
+      'Skills': worker.skills?.join(', ') || '',
+      'Experience (Years)': worker.experience || 0,
+      'Hourly Rate': worker.hourlyRate || 0,
+      'Daily Rate': worker.dailyRate || 0,
+      'Location': worker.location || '',
+      'Rating': worker.rating || 0,
+      'Total Ratings': worker.totalRatings || 0,
+      'Completed Jobs': worker.completedJobs || 0,
+      'Verified': worker.isVerified ? 'Yes' : 'No',
+      'Available': worker.isAvailable ? 'Yes' : 'No',
+      'Created At': worker.createdAt ? format(worker.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Workers');
+    XLSX.writeFile(wb, `workers_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
+  const exportRequestsToExcel = () => {
+    const exportData = requests.map(request => ({
+      'User Name': request.userName || '',
+      'Crew Category': request.crewCategory || '',
+      'Role Required': request.roleRequired || '',
+      'Start Date': request.startDate ? format(request.startDate, 'yyyy-MM-dd') : '',
+      'End Date': request.endDate ? format(request.endDate, 'yyyy-MM-dd') : '',
+      'Duration (Hours)': request.durationHours || 0,
+      'Location': request.location || '',
+      'Status': request.status || '',
+      'Payment Amount': request.paymentAmount || 0,
+      'Payment Type': request.paymentType || '',
+      'Assigned Worker': request.assignedWorkerName || '',
+      'Description': request.description || '',
+      'Created At': request.createdAt ? format(request.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Work Requests');
+    XLSX.writeFile(wb, `work_requests_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   const currentData = activeTab === 'workers' ? filteredWorkers : filteredRequests;
   const totalPages = Math.ceil(currentData.length / pageSize);
   const paginatedData = currentData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -319,6 +368,13 @@ export default function WorkforcePage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={activeTab === 'workers' ? exportWorkersToExcel : exportRequestsToExcel}
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          <Download className="h-4 w-4" />
+          Export {activeTab === 'workers' ? 'Workers' : 'Requests'}
+        </button>
       </div>
 
       {/* Table */}

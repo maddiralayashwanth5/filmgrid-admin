@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 import {
   CheckCircle,
   XCircle,
@@ -20,6 +21,7 @@ import {
   Upload,
   Loader2,
   Users,
+  Download,
 } from 'lucide-react';
 import {
   getEquipment,
@@ -455,6 +457,26 @@ export default function EquipmentPage() {
     setExpandedBrands(new Set());
   };
 
+  const exportEquipmentToExcel = () => {
+    const exportData = equipment.map(item => ({
+      'Title': item.title || '',
+      'Brand': item.brand || '',
+      'Category': item.category || '',
+      'Owner Name': item.ownerName || '',
+      'City': item.city || '',
+      'Daily Rate': item.dailyRate || 0,
+      'Active': item.isActive ? 'Yes' : 'No',
+      'Verified': item.isVerified ? 'Yes' : 'No',
+      'Description': item.description || '',
+      'Created At': item.createdAt ? format(item.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lender Equipment');
+    XLSX.writeFile(wb, `lender_equipment_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   const handleVerify = async (id: string, approved: boolean) => {
     try {
       await verifyEquipment(id, approved);
@@ -712,6 +734,12 @@ export default function EquipmentPage() {
           </button>
         </div>
 
+        <button
+          onClick={exportEquipmentToExcel}
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          <Download className="h-4 w-4" /> Export Excel
+        </button>
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"

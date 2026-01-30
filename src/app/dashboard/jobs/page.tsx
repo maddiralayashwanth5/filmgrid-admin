@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 import {
   Briefcase,
   MapPin,
@@ -23,6 +24,7 @@ import {
   Upload,
   Loader2,
   Image as ImageIcon,
+  Download,
 } from 'lucide-react';
 import {
   collection,
@@ -345,6 +347,35 @@ export default function JobsPage() {
     return matchesSearch && matchesCategory;
   });
 
+  const exportJobsToExcel = () => {
+    const exportData = jobs.map(job => ({
+      'Title': job.title || '',
+      'Category': job.category || '',
+      'Job Type': job.jobType || '',
+      'Location': job.location || '',
+      'City': job.city || '',
+      'Remote': job.isRemote ? 'Yes' : 'No',
+      'Salary Min': job.salaryMin || 0,
+      'Salary Max': job.salaryMax || 0,
+      'Salary Type': job.salaryType || '',
+      'Experience Level': job.experienceLevel || '',
+      'Skills': job.skills?.join(', ') || '',
+      'Requirements': job.requirements?.join(', ') || '',
+      'Applications': job.applicationsCount || 0,
+      'Active': job.isActive ? 'Yes' : 'No',
+      'Verified': job.isVerified ? 'Yes' : 'No',
+      'Live Job': job.isLiveJob ? 'Yes' : 'No',
+      'Poster Name': job.posterName || '',
+      'Application Deadline': job.applicationDeadline ? format(job.applicationDeadline, 'yyyy-MM-dd') : '',
+      'Created At': job.createdAt ? format(job.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Jobs');
+    XLSX.writeFile(wb, `jobs_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   const totalPages = Math.ceil(filteredJobs.length / pageSize);
   const paginatedData = filteredJobs.slice(
     (currentPage - 1) * pageSize,
@@ -432,6 +463,13 @@ export default function JobsPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={exportJobsToExcel}
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          <Download className="h-4 w-4" />
+          Export Excel
+        </button>
       </div>
 
       {/* Table */}

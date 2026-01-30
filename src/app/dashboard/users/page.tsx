@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 import {
   MoreVertical,
   Shield,
@@ -13,6 +14,7 @@ import {
   Phone,
   X,
   Users,
+  Download,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification, findDuplicateUsers, cleanupDuplicateUsers, cleanupAllDuplicateUsers, getRoleVerifications, approveRoleVerification, rejectRoleVerification, type DuplicateUserGroup, type RoleVerificationRequest, type RoleVerificationType } from '@/lib/firestore';
@@ -467,6 +469,26 @@ export default function UsersPage() {
     return normalized;
   };
 
+  const exportUsersToExcel = () => {
+    const exportData = users.map(user => ({
+      'Name': user.displayName || '',
+      'Email': user.email || '',
+      'Phone': user.phoneNumber || '',
+      'FG ID': user.filmgridId || '',
+      'Role': user.role || '',
+      'Rating': user.rating || 0,
+      'Total Ratings': user.totalRatings || 0,
+      'Verification Status': user.verificationStatus || '',
+      'Is Banned': user.isBanned ? 'Yes' : 'No',
+      'Created At': user.createdAt ? format(user.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Users');
+    XLSX.writeFile(wb, `users_export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -476,6 +498,13 @@ export default function UsersPage() {
         </div>
         {activeTab === 'users' && (
           <div className="flex gap-3">
+            <button
+              onClick={exportUsersToExcel}
+              className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </button>
             <button
               onClick={handleOpenDuplicatesModal}
               className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"

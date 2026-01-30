@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
   Plus,
@@ -18,6 +19,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import {
   getEquipmentCatalog,
@@ -366,6 +368,23 @@ export default function EquipmentCatalogPage() {
     XLSX.writeFile(wb, 'equipment_template.xlsx');
   };
 
+  const exportCatalogToExcel = () => {
+    const exportData = catalog.map(item => ({
+      'Name': item.name || '',
+      'Brand': item.brand || '',
+      'Category': item.category || '',
+      'Description': item.description || '',
+      'Daily Rate': item.suggestedDailyRate || 0,
+      'Active': item.isActive ? 'Yes' : 'No',
+      'Created At': item.createdAt ? format(item.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Equipment Catalog');
+    XLSX.writeFile(wb, `equipment_catalog_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -401,6 +420,12 @@ export default function EquipmentCatalogPage() {
           ))}
         </select>
 
+        <button
+          onClick={exportCatalogToExcel}
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          <Download className="h-4 w-4" /> Export Excel
+        </button>
         <button
           onClick={() => excelInputRef.current?.click()}
           className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"

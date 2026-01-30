@@ -26,6 +26,7 @@ import {
   Upload,
   Loader2,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import {
   collection,
@@ -503,6 +504,27 @@ export default function StoreCataloguePage() {
     XLSX.writeFile(wb, 'store_catalogue_template.xlsx');
   };
 
+  const exportStoreToExcel = () => {
+    const exportData = items.map(item => ({
+      'Title': item.title || '',
+      'Type': item.itemType || '',
+      'Category': item.category || '',
+      'Price': item.price || 0,
+      'Condition': item.condition || '',
+      'Location': item.location || '',
+      'Seller Name': item.sellerName || '',
+      'Seller Phone': item.sellerPhone || '',
+      'Status': item.status || '',
+      'Description': item.description || '',
+      'Created At': item.createdAt ? format(item.createdAt, 'yyyy-MM-dd HH:mm') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Store Catalogue');
+    XLSX.writeFile(wb, `store_catalogue_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   // Filter items
   const filteredItems = items.filter((item) => {
     const matchesSearch = 
@@ -540,6 +562,13 @@ export default function StoreCataloguePage() {
           <p className="text-gray-500">Manage sales items - equipment and non-equipment</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={exportStoreToExcel}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            <Download className="h-4 w-4" />
+            Export Excel
+          </button>
           <button
             onClick={() => excelInputRef.current?.click()}
             className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
