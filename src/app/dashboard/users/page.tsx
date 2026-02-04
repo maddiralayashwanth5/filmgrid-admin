@@ -15,6 +15,7 @@ import {
   X,
   Users,
   Download,
+  Clock,
 } from 'lucide-react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getUsers, updateUserRole, toggleUserBan, deleteUser, resetUserVerification, resetAllUsersVerification, toggleRoleVerification, setAllRolesVerification, findDuplicateUsers, cleanupDuplicateUsers, cleanupAllDuplicateUsers, getRoleVerifications, approveRoleVerification, rejectRoleVerification, type DuplicateUserGroup, type RoleVerificationRequest, type RoleVerificationType } from '@/lib/firestore';
@@ -30,7 +31,8 @@ export default function UsersPage() {
   const [showDetailsModal, setShowDetailsModal] = useState<User | null>(null);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [verificationFilter, setVerificationFilter] = useState<'all' | 'pending' | 'verified'>('all');
+  const [verificationFilter, setVerificationFilter] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'banned'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'lender' | 'crew' | 'influencer' | 'store'>('all');
   const [showResetAllModal, setShowResetAllModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showRoleVerificationModal, setShowRoleVerificationModal] = useState<User | null>(null);
@@ -44,6 +46,7 @@ export default function UsersPage() {
   const [roleRequests, setRoleRequests] = useState<RoleVerificationRequest[]>([]);
   const [loadingRoleRequests, setLoadingRoleRequests] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [roleVerifyModal, setRoleVerifyModal] = useState<{ user: User; role: string } | null>(null);
   const pageSize = 15;
 
   useEffect(() => {
@@ -108,21 +111,32 @@ export default function UsersPage() {
 
   const openRoleVerificationModal = (user: User) => {
     // Parse role verifications from user data
-    const userData = user as any;
     setRoleVerifications({
-      filmmaker: userData.filmmakerVerification?.status === 'verified',
-      lender: userData.lenderVerification?.status === 'verified',
-      worker: userData.workerVerification?.status === 'verified',
-      influencer: userData.influencerVerification?.status === 'verified',
+      filmmaker: user.lenderVerification?.status === 'verified', // filmmaker uses lender verification
+      lender: user.lenderVerification?.status === 'verified',
+      worker: user.workerVerification?.status === 'verified',
+      influencer: user.influencerVerification?.status === 'verified',
+      store: user.storeVerification?.status === 'verified',
     });
     setShowRoleVerificationModal(user);
     setShowMenu(null);
   };
 
-  const handleToggleRoleVerification = async (role: 'filmmaker' | 'lender' | 'worker' | 'influencer', verified: boolean) => {
+  const handleToggleRoleVerification = async (role: 'filmmaker' | 'lender' | 'worker' | 'influencer' | 'store', verified: boolean) => {
     if (!showRoleVerificationModal) return;
     try {
-      await toggleRoleVerification(showRoleVerificationModal.uid, role, verified);
+      // For store, we need to handle it differently
+      if (role === 'store') {
+        const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        await updateDoc(doc(db, 'users', showRoleVerificationModal.uid), {
+          'storeVerification.status': verified ? 'verified' : 'pending',
+          'storeVerification.verifiedAt': verified ? Timestamp.now() : null,
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        await toggleRoleVerification(showRoleVerificationModal.uid, role, verified);
+      }
       setRoleVerifications(prev => ({ ...prev, [role]: verified }));
     } catch (error) {
       console.error('Error toggling role verification:', error);
@@ -133,11 +147,20 @@ export default function UsersPage() {
     if (!showRoleVerificationModal) return;
     try {
       await setAllRolesVerification(showRoleVerificationModal.uid, verified);
+      // Also update store verification
+      const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      await updateDoc(doc(db, 'users', showRoleVerificationModal.uid), {
+        'storeVerification.status': verified ? 'verified' : 'pending',
+        'storeVerification.verifiedAt': verified ? Timestamp.now() : null,
+        updatedAt: Timestamp.now(),
+      });
       setRoleVerifications({
         filmmaker: verified,
         lender: verified,
         worker: verified,
         influencer: verified,
+        store: verified,
       });
       setShowRoleVerificationModal(null);
     } catch (error) {
@@ -249,6 +272,135 @@ export default function UsersPage() {
     return <Icon className={`h-5 w-5 ${color}`} />;
   };
 
+  // Helper to check if user has applied for a role (verification exists)
+  const hasRoleApplication = (user: User, role: string) => {
+    switch (role) {
+      case 'user':
+        return true; // All users have base user status
+      case 'lender':
+        return user.lenderVerification !== undefined;
+      case 'crew':
+        return user.workerVerification !== undefined;
+      case 'influencer':
+        return user.influencerVerification !== undefined;
+      case 'store':
+        return user.storeVerification !== undefined;
+      default:
+        return false;
+    }
+  };
+
+  // Helper to check if role is verified
+  const isRoleVerified = (user: User, role: string) => {
+    switch (role) {
+      case 'user':
+        return user.verificationStatus === 'verified';
+      case 'lender':
+        return user.lenderVerification?.status === 'verified';
+      case 'crew':
+        return user.workerVerification?.status === 'verified';
+      case 'influencer':
+        return user.influencerVerification?.status === 'verified';
+      case 'store':
+        return user.storeVerification?.status === 'verified';
+      default:
+        return false;
+    }
+  };
+
+  // Helper to check if role verification is pending
+  const isRolePending = (user: User, role: string) => {
+    switch (role) {
+      case 'user':
+        return user.verificationStatus === 'pending';
+      case 'lender':
+        return user.lenderVerification?.status === 'pending';
+      case 'crew':
+        return user.workerVerification?.status === 'pending';
+      case 'influencer':
+        return user.influencerVerification?.status === 'pending';
+      case 'store':
+        return user.storeVerification?.status === 'pending';
+      default:
+        return false;
+    }
+  };
+
+  // Handle role verification update from modal
+  const handleRoleVerificationUpdate = async (user: User, role: string, newStatus: 'verified' | 'pending' | 'rejected') => {
+    try {
+      const roleFieldMap: Record<string, string> = {
+        'user': 'verificationStatus',
+        'lender': 'lenderVerification',
+        'crew': 'workerVerification',
+        'influencer': 'influencerVerification',
+        'store': 'storeVerification',
+      };
+      
+      const fieldName = roleFieldMap[role];
+      if (!fieldName) return;
+      
+      const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      
+      if (role === 'user') {
+        await updateDoc(doc(db, 'users', user.uid), {
+          verificationStatus: newStatus,
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        await updateDoc(doc(db, 'users', user.uid), {
+          [`${fieldName}.status`]: newStatus,
+          [`${fieldName}.verifiedAt`]: newStatus === 'verified' ? Timestamp.now() : null,
+          updatedAt: Timestamp.now(),
+        });
+      }
+      setRoleVerifyModal(null);
+    } catch (error) {
+      console.error('Error updating role verification:', error);
+    }
+  };
+
+  // Helper to get role verification icon - only show if user has applied for that role
+  const getRoleVerificationIcon = (user: User, role: string) => {
+    const hasApplied = hasRoleApplication(user, role);
+    const verified = isRoleVerified(user, role);
+    const pending = isRolePending(user, role);
+    
+    if (!hasApplied) {
+      // No application - show empty circle (not clickable)
+      return (
+        <div className="w-5 h-5 rounded-full border-2 border-gray-200" title="Not applied" />
+      );
+    }
+    
+    // Clickable button to open modal
+    const handleClick = () => setRoleVerifyModal({ user, role });
+    
+    if (verified) {
+      return (
+        <button onClick={handleClick} className="hover:opacity-70 transition-opacity cursor-pointer" title="Click to manage">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+        </button>
+      );
+    }
+    
+    if (pending) {
+      return (
+        <button onClick={handleClick} className="hover:opacity-70 transition-opacity cursor-pointer" title="Click to manage">
+          <Clock className="h-5 w-5 text-orange-500" />
+        </button>
+      );
+    }
+    
+    // Rejected or not verified
+    return (
+      <button onClick={handleClick} className="hover:opacity-70 transition-opacity cursor-pointer" title="Click to manage">
+        <XCircle className="h-5 w-5 text-red-400" />
+      </button>
+    );
+  };
+
   const columns = [
     {
       key: 'displayName',
@@ -257,7 +409,7 @@ export default function UsersPage() {
         const displayName = user.displayName || user.filmgridId || 'Unknown User';
         return (
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-600">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
               ) : (
@@ -266,7 +418,7 @@ export default function UsersPage() {
             </div>
             <div>
               <p className="font-medium text-gray-900">{displayName}</p>
-              <p className="text-xs text-gray-500">{user.filmgridId}</p>
+              <p className="text-xs text-gray-500">{user.filmgridId || 'FG-ID'}</p>
             </div>
           </div>
         );
@@ -275,17 +427,35 @@ export default function UsersPage() {
     {
       key: 'phoneNumber',
       header: 'Phone',
-      render: (user: User) => <span className="text-gray-600">{user.phoneNumber || 'No phone'}</span>,
+      render: (user: User) => <span className="text-gray-600">{user.phoneNumber || '-'}</span>,
     },
     {
-      key: 'role',
-      header: 'Role',
-      render: (user: User) => getRoleBadge(user.role),
-    },
-    {
-      key: 'verificationStatus',
-      header: 'Verified',
-      render: (user: User) => getVerificationBadge(user.verificationStatus),
+      key: 'rolesVerified',
+      header: (
+        <div className="text-center min-w-[280px]">
+          <span className="uppercase text-xs font-semibold tracking-wider text-gray-500">Roles Verified</span>
+          <div className="flex justify-center mt-1.5">
+            <div className="flex gap-4 text-[10px] font-normal normal-case text-gray-400">
+              <span className="w-10 text-center">User</span>
+              <span className="w-10 text-center">Lender</span>
+              <span className="w-10 text-center">Crew</span>
+              <span className="w-12 text-center">Influencer</span>
+              <span className="w-10 text-center">Store</span>
+            </div>
+          </div>
+        </div>
+      ),
+      render: (user: User) => (
+        <div className="flex items-center justify-center min-w-[280px]">
+          <div className="flex gap-4">
+            <div className="w-10 flex justify-center">{getRoleVerificationIcon(user, 'user')}</div>
+            <div className="w-10 flex justify-center">{getRoleVerificationIcon(user, 'lender')}</div>
+            <div className="w-10 flex justify-center">{getRoleVerificationIcon(user, 'crew')}</div>
+            <div className="w-12 flex justify-center">{getRoleVerificationIcon(user, 'influencer')}</div>
+            <div className="w-10 flex justify-center">{getRoleVerificationIcon(user, 'store')}</div>
+          </div>
+        </div>
+      ),
     },
     {
       key: 'rating',
@@ -294,7 +464,6 @@ export default function UsersPage() {
         <div className="flex items-center gap-1">
           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
           <span>{(user.rating ?? 0).toFixed(1)}</span>
-          <span className="text-gray-400">({user.totalRatings ?? 0})</span>
         </div>
       ),
     },
@@ -302,22 +471,10 @@ export default function UsersPage() {
       key: 'createdAt',
       header: 'Joined',
       render: (user: User) => (
-        <span className="text-gray-600">
-          {user.createdAt ? format(user.createdAt, 'MMM d, yyyy') : 'N/A'}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (user: User) => (
-        <span
-          className={`rounded-full px-2 py-1 text-xs font-medium ${
-            user.isBanned ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-          }`}
-        >
-          {user.isBanned ? 'Banned' : 'Active'}
-        </span>
+        <div className="text-gray-600">
+          <div>{user.createdAt ? format(user.createdAt, 'MMM d, yyyy') : 'N/A'}</div>
+          <div className="text-xs text-gray-400">{user.createdAt ? format(user.createdAt, 'h:mm a') : ''}</div>
+        </div>
       ),
     },
     {
@@ -336,91 +493,56 @@ export default function UsersPage() {
           </button>
           {showMenu === user.uid && (
             <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-xl">
-              <p className="border-b px-4 py-2 text-xs font-medium text-gray-500">Change Role</p>
               <button
-                onClick={() => handleRoleChange(user.uid, 'user')}
-                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                  user.role === 'user' || user.role === 'renter' ? 'bg-blue-50 text-blue-600' : ''
+                onClick={() => handleToggleBan(user)}
+                className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${
+                  user.isBanned ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
                 }`}
               >
-                Filmmaker
+                <Ban className="h-4 w-4" />
+                {user.isBanned ? 'Unban User' : 'Ban User'}
               </button>
-              <button
-                onClick={() => handleRoleChange(user.uid, 'lender')}
-                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                  user.role === 'lender' ? 'bg-blue-50 text-blue-600' : ''
-                }`}
-              >
-                Lender
-              </button>
-              <button
-                onClick={() => handleRoleChange(user.uid, 'worker')}
-                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                  user.role === 'worker' ? 'bg-blue-50 text-blue-600' : ''
-                }`}
-              >
-                Crew
-              </button>
-              <button
-                onClick={() => handleRoleChange(user.uid, 'influencer')}
-                className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                  user.role === 'influencer' ? 'bg-blue-50 text-blue-600' : ''
-                }`}
-              >
-                Influencer
-              </button>
-              <div className="border-t">
-                <button
-                  onClick={() => handleToggleBan(user)}
-                  className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${
-                    user.isBanned ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
-                  }`}
-                >
-                  <Ban className="h-4 w-4" />
-                  {user.isBanned ? 'Unban User' : 'Ban User'}
-                </button>
-                {deleteConfirm === user.uid ? (
-                  <div className="border-t bg-red-50 p-2">
-                    <p className="mb-2 text-xs text-red-600">Delete this user permanently?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleDeleteUser(user.uid)}
-                        className="flex-1 rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
-                      >
-                        Yes, Delete
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(null)}
-                        className="flex-1 rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+              {deleteConfirm === user.uid ? (
+                <div className="border-t bg-red-50 p-2">
+                  <p className="mb-2 text-xs text-red-600">Delete this user permanently?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDeleteUser(user.uid)}
+                      className="flex-1 rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
+                    >
+                      Yes, Delete
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="flex-1 rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirm(user.uid)}
-                    className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Delete User
-                  </button>
-                )}
+                </div>
+              ) : (
                 <button
-                  onClick={() => openRoleVerificationModal(user)}
-                  className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50"
-                >
-                  <Shield className="h-4 w-4" />
-                  Manage Verification
-                </button>
-                <button
-                  onClick={() => handleResetVerification(user.uid)}
-                  className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50"
+                  onClick={() => setDeleteConfirm(user.uid)}
+                  className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                 >
                   <XCircle className="h-4 w-4" />
-                  Reset All Verification
+                  Delete User
                 </button>
-              </div>
+              )}
+              <button
+                onClick={() => openRoleVerificationModal(user)}
+                className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50"
+              >
+                <Shield className="h-4 w-4" />
+                Manage Verification
+              </button>
+              <button
+                onClick={() => handleResetVerification(user.uid)}
+                className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50"
+              >
+                <XCircle className="h-4 w-4" />
+                Reset All Verification
+              </button>
             </div>
           )}
         </div>
@@ -592,56 +714,99 @@ export default function UsersPage() {
       {activeTab === 'users' && (
         <>
           {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="relative max-w-md flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search users by name..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-        
-        {/* Verification Filter */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setVerificationFilter('all'); setCurrentPage(1); }}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              verificationFilter === 'all'
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            All Users
-          </button>
-          <button
-            onClick={() => { setVerificationFilter('pending'); setCurrentPage(1); }}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              verificationFilter === 'pending'
-                ? 'bg-orange-100 text-orange-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Pending Verification ({users.filter(u => u.verificationStatus === 'pending' && u.idProofUrl).length})
-          </button>
-          <button
-            onClick={() => { setVerificationFilter('verified'); setCurrentPage(1); }}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              verificationFilter === 'verified'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Verified
-          </button>
-        </div>
-      </div>
+          <div className="mb-4 space-y-3">
+            {/* Search Row */}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, or FG ID..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Filter Chips Row */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Verification Status Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 uppercase">Status:</span>
+                <div className="flex gap-1">
+                  {[
+                    { key: 'all', label: 'All', color: 'blue' },
+                    { key: 'pending', label: 'Pending', color: 'orange' },
+                    { key: 'verified', label: 'Verified', color: 'green' },
+                    { key: 'rejected', label: 'Rejected', color: 'red' },
+                    { key: 'banned', label: 'Banned', color: 'gray' },
+                  ].map(({ key, label, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setVerificationFilter(key as typeof verificationFilter); setCurrentPage(1); }}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        verificationFilter === key
+                          ? `bg-${color}-100 text-${color}-700 ring-1 ring-${color}-300`
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-6 w-px bg-gray-200" />
+
+              {/* Role Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 uppercase">Role:</span>
+                <div className="flex gap-1">
+                  {[
+                    { key: 'all', label: 'All Roles', color: 'blue' },
+                    { key: 'lender', label: 'Lender', color: 'cyan' },
+                    { key: 'crew', label: 'Crew', color: 'amber' },
+                    { key: 'influencer', label: 'Influencer', color: 'pink' },
+                    { key: 'store', label: 'Store', color: 'purple' },
+                  ].map(({ key, label, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setRoleFilter(key as typeof roleFilter); setCurrentPage(1); }}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        roleFilter === key
+                          ? `bg-${color}-100 text-${color}-700 ring-1 ring-${color}-300`
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {(verificationFilter !== 'all' || roleFilter !== 'all' || search) && (
+                <>
+                  <div className="h-6 w-px bg-gray-200" />
+                  <button
+                    onClick={() => {
+                      setVerificationFilter('all');
+                      setRoleFilter('all');
+                      setSearch('');
+                      setCurrentPage(1);
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700 underline"
+                  >
+                    Clear all filters
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
@@ -660,15 +825,36 @@ export default function UsersPage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {(() => {
-              let filteredData = users.filter((user) =>
-                user.displayName?.toLowerCase().includes(search.toLowerCase())
-              );
+              // Search filter - search by name, phone, or FG ID
+              let filteredData = users.filter((user) => {
+                const searchLower = search.toLowerCase();
+                return (
+                  user.displayName?.toLowerCase().includes(searchLower) ||
+                  user.phoneNumber?.toLowerCase().includes(searchLower) ||
+                  user.filmgridId?.toLowerCase().includes(searchLower)
+                );
+              });
               
-              // Apply verification filter
+              // Apply verification status filter
               if (verificationFilter === 'pending') {
-                filteredData = filteredData.filter(u => u.verificationStatus === 'pending' && u.idProofUrl);
+                filteredData = filteredData.filter(u => u.verificationStatus === 'pending');
               } else if (verificationFilter === 'verified') {
                 filteredData = filteredData.filter(u => u.verificationStatus === 'verified');
+              } else if (verificationFilter === 'rejected') {
+                filteredData = filteredData.filter(u => u.verificationStatus === 'rejected');
+              } else if (verificationFilter === 'banned') {
+                filteredData = filteredData.filter(u => u.isBanned === true);
+              }
+
+              // Apply role filter
+              if (roleFilter === 'lender') {
+                filteredData = filteredData.filter(u => u.lenderVerification?.status === 'verified' || u.lenderVerification?.status === 'pending');
+              } else if (roleFilter === 'crew') {
+                filteredData = filteredData.filter(u => u.workerVerification?.status === 'verified' || u.workerVerification?.status === 'pending');
+              } else if (roleFilter === 'influencer') {
+                filteredData = filteredData.filter(u => u.influencerVerification?.status === 'verified' || u.influencerVerification?.status === 'pending');
+              } else if (roleFilter === 'store') {
+                filteredData = filteredData.filter(u => u.storeVerification?.status === 'verified' || u.storeVerification?.status === 'pending');
               }
               
               const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -704,15 +890,36 @@ export default function UsersPage() {
 
         {/* Pagination */}
         {(() => {
-          let filteredData = users.filter((user) =>
-            user.displayName?.toLowerCase().includes(search.toLowerCase())
-          );
+          // Search filter - search by name, phone, or FG ID
+          let filteredData = users.filter((user) => {
+            const searchLower = search.toLowerCase();
+            return (
+              user.displayName?.toLowerCase().includes(searchLower) ||
+              user.phoneNumber?.toLowerCase().includes(searchLower) ||
+              user.filmgridId?.toLowerCase().includes(searchLower)
+            );
+          });
           
-          // Apply verification filter
+          // Apply verification status filter
           if (verificationFilter === 'pending') {
-            filteredData = filteredData.filter(u => u.verificationStatus === 'pending' && u.idProofUrl);
+            filteredData = filteredData.filter(u => u.verificationStatus === 'pending');
           } else if (verificationFilter === 'verified') {
             filteredData = filteredData.filter(u => u.verificationStatus === 'verified');
+          } else if (verificationFilter === 'rejected') {
+            filteredData = filteredData.filter(u => u.verificationStatus === 'rejected');
+          } else if (verificationFilter === 'banned') {
+            filteredData = filteredData.filter(u => u.isBanned === true);
+          }
+
+          // Apply role filter
+          if (roleFilter === 'lender') {
+            filteredData = filteredData.filter(u => u.lenderVerification?.status === 'verified' || u.lenderVerification?.status === 'pending');
+          } else if (roleFilter === 'crew') {
+            filteredData = filteredData.filter(u => u.workerVerification?.status === 'verified' || u.workerVerification?.status === 'pending');
+          } else if (roleFilter === 'influencer') {
+            filteredData = filteredData.filter(u => u.influencerVerification?.status === 'verified' || u.influencerVerification?.status === 'pending');
+          } else if (roleFilter === 'store') {
+            filteredData = filteredData.filter(u => u.storeVerification?.status === 'verified' || u.storeVerification?.status === 'pending');
           }
           
           const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -1076,12 +1283,13 @@ export default function UsersPage() {
             </p>
 
             <div className="space-y-3">
-              {(['filmmaker', 'lender', 'worker', 'influencer'] as const).map((role) => {
+              {(['filmmaker', 'lender', 'worker', 'influencer', 'store'] as const).map((role) => {
                 const roleNames: Record<string, string> = {
                   filmmaker: 'Filmmaker',
                   lender: 'Gear Renter',
                   worker: 'Film Worker',
                   influencer: 'Influencer',
+                  store: 'Store Owner',
                 };
                 const isVerified = roleVerifications[role] || false;
                 return (
@@ -1260,6 +1468,75 @@ export default function UsersPage() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role Verification Modal */}
+      {roleVerifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-4">
+              <h3 className="text-lg font-semibold">
+                {roleVerifyModal.role.charAt(0).toUpperCase() + roleVerifyModal.role.slice(1)} Verification
+              </h3>
+              <button onClick={() => setRoleVerifyModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">User:</span> {roleVerifyModal.user.displayName || roleVerifyModal.user.filmgridId || 'Unknown'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Current Status:</span>{' '}
+                  <span className={
+                    isRoleVerified(roleVerifyModal.user, roleVerifyModal.role) ? 'text-green-600' :
+                    isRolePending(roleVerifyModal.user, roleVerifyModal.role) ? 'text-orange-500' : 'text-red-500'
+                  }>
+                    {isRoleVerified(roleVerifyModal.user, roleVerifyModal.role) ? 'Verified' :
+                     isRolePending(roleVerifyModal.user, roleVerifyModal.role) ? 'Pending' : 'Not Verified'}
+                  </span>
+                </p>
+              </div>
+              
+              <p className="mb-4 text-sm text-gray-500">Select an action for this role verification:</p>
+              
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => handleRoleVerificationUpdate(roleVerifyModal.user, roleVerifyModal.role, 'verified')}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approve / Verify
+                </button>
+                <button
+                  onClick={() => handleRoleVerificationUpdate(roleVerifyModal.user, roleVerifyModal.role, 'pending')}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 text-sm font-medium text-white hover:bg-orange-600"
+                >
+                  <Clock className="h-4 w-4" />
+                  Set to Pending
+                </button>
+                <button
+                  onClick={() => handleRoleVerificationUpdate(roleVerifyModal.user, roleVerifyModal.role, 'rejected')}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex justify-end border-t p-4">
+              <button
+                onClick={() => setRoleVerifyModal(null)}
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

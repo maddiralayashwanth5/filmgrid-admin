@@ -8,6 +8,14 @@ export interface ContactInfo {
   email?: string;
 }
 
+export interface RoleVerification {
+  status?: 'pending' | 'verified' | 'rejected' | 'notVerified';
+  submittedAt?: Date;
+  verifiedAt?: Date;
+  verifiedBy?: string;
+  rejectionNotes?: string;
+}
+
 export interface User {
   uid: string;
   filmgridId: string;
@@ -29,6 +37,11 @@ export interface User {
   contacts?: ContactInfo[];
   referredBy?: string;
   requestedRole?: UserRole;
+  // Role-specific verification
+  lenderVerification?: RoleVerification;
+  workerVerification?: RoleVerification;
+  influencerVerification?: RoleVerification;
+  storeVerification?: RoleVerification;
 }
 
 // Equipment types

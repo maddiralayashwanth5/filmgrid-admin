@@ -40,7 +40,8 @@ import {
   Timestamp,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ItemStatus = 'pending' | 'approved' | 'rejected' | 'sold';
@@ -132,6 +133,10 @@ export default function StoreCataloguePage() {
   }>>([]);
   const [isUploadingExcel, setIsUploadingExcel] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -239,6 +244,7 @@ export default function StoreCataloguePage() {
         imageUrl: item.imageUrl || '',
         status: item.status,
       });
+      setImagePreview(item.imageUrl || null);
     } else {
       setEditingItem(null);
       setFormData({
@@ -255,8 +261,31 @@ export default function StoreCataloguePage() {
         imageUrl: '',
         status: 'pending',
       });
+      setImagePreview(null);
     }
+    setImageFile(null);
     setShowForm(true);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    if (!storage) throw new Error('Storage not initialized');
+    const timestamp = Date.now();
+    const fileName = `store-items/${timestamp}_${file.name}`;
+    const storageRef = ref(storage, fileName);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
   };
 
   const handleSaveItem = async () => {
@@ -267,6 +296,23 @@ export default function StoreCataloguePage() {
 
     setSaving(true);
     try {
+      let imageUrl = formData.imageUrl;
+      
+      // Upload image if a new file was selected
+      if (imageFile) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadImage(imageFile);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          alert('Failed to upload image. Please try again.');
+          setSaving(false);
+          setUploadingImage(false);
+          return;
+        }
+        setUploadingImage(false);
+      }
+
       const itemData = {
         title: formData.title,
         description: formData.description,
@@ -278,7 +324,7 @@ export default function StoreCataloguePage() {
         sellerName: formData.sellerName,
         sellerPhone: formData.sellerPhone,
         sellerFgId: formData.sellerFgId || null,
-        imageUrl: formData.imageUrl || null,
+        imageUrl: imageUrl || null,
         status: formData.status,
         updatedAt: Timestamp.now(),
       };
@@ -990,14 +1036,62 @@ export default function StoreCataloguePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Image URL</label>
+                <label className="block text-sm font-medium text-gray-700">Image</label>
                 <input
-                  type="text"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
-                  placeholder="https://..."
+                  type="file"
+                  ref={imageInputRef}
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
                 />
+                <div className="mt-1">
+                  {(imagePreview || formData.imageUrl) ? (
+                    <div className="relative">
+                      <img
+                        src={imagePreview || formData.imageUrl}
+                        alt="Preview"
+                        className="h-32 w-full rounded-lg object-cover border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFile(null);
+                          setImagePreview(null);
+                          setFormData({ ...formData, imageUrl: '' });
+                          if (imageInputRef.current) imageInputRef.current.value = '';
+                        }}
+                        className="absolute top-2 right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="absolute bottom-2 right-2 rounded-lg bg-white/90 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-white"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="flex h-32 w-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 hover:border-yellow-500 hover:bg-yellow-50 transition-colors"
+                    >
+                      <div className="text-center">
+                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                        <p className="mt-1 text-sm text-gray-500">Click to upload image</p>
+                        <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+                {uploadingImage && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-yellow-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading image...
+                  </div>
+                )}
               </div>
 
               <div>

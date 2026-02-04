@@ -64,6 +64,11 @@ const normalizeUserData = (docId: string, data: Record<string, unknown>): User =
     verifiedBy: data.verifiedBy as string | undefined,
     isBanned: (data.isBanned as boolean) || false,
     requestedRole: data.requestedRole as string | undefined,
+    // Role-specific verification data
+    lenderVerification: data.lenderVerification as { status?: string } | undefined,
+    workerVerification: data.workerVerification as { status?: string } | undefined,
+    influencerVerification: data.influencerVerification as { status?: string } | undefined,
+    storeVerification: data.storeVerification as { status?: string } | undefined,
   } as User;
 };
 
@@ -989,6 +994,10 @@ export const cancelOpenOrder = async (orderId: string) => {
 // ==================== DASHBOARD STATS ====================
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
+  if (!db) {
+    throw new Error('Firestore not initialized');
+  }
+  
   const [
     usersSnapshot,
     equipmentSnapshot,

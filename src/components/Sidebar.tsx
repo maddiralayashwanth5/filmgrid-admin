@@ -28,6 +28,7 @@ import {
   UserCheck,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -174,29 +175,40 @@ export default function Sidebar() {
         />
       )}
 
-      <aside className={`fixed left-0 top-0 z-40 h-screen w-64 bg-gray-900 text-white transition-transform duration-300 lg:translate-x-0 ${
+      <aside className={`fixed left-0 top-0 z-40 h-screen w-72 bg-slate-900 text-white transition-transform duration-300 ease-out lg:translate-x-0 ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-center border-b border-gray-800">
-          <h1 className="text-xl font-bold text-blue-400">FilmGrid Admin</h1>
+        <div className="flex h-20 items-center gap-3 px-6 border-b border-slate-800/50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white">FilmGrid</h1>
+            <p className="text-xs text-slate-400">Admin Panel</p>
+          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 py-6">
           {/* Dashboard */}
           <Link
             href="/dashboard"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
               pathname === '/dashboard'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
             }`}
           >
-            <LayoutDashboard className="h-5 w-5" />
+            <LayoutDashboard className={`h-5 w-5 transition-transform duration-200 ${pathname === '/dashboard' ? '' : 'group-hover:scale-110'}`} />
             Dashboard
           </Link>
+
+          {/* Section Label */}
+          <div className="mt-6 mb-2 px-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Management</p>
+          </div>
 
           {/* Categorized Navigation */}
           {sidebarCategories.map((category) => {
@@ -204,37 +216,33 @@ export default function Sidebar() {
             const isActive = isCategoryActive(category);
 
             return (
-              <div key={category.id}>
+              <div key={category.id} className="space-y-1">
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  className={`group flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-yellow-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <category.icon className="h-5 w-5" />
+                    <category.icon className={`h-5 w-5 transition-transform duration-200 ${!isActive ? 'group-hover:scale-110' : ''}`} />
                     {category.label}
                   </div>
-                  {isOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
                 </button>
-                {isOpen && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-4">
+                <div className={`overflow-hidden transition-all duration-200 ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="ml-4 space-y-0.5 border-l-2 border-slate-700/50 pl-4 py-1">
                     {category.items.map((item) => {
                       const isItemActive = pathname === item.href || pathname.startsWith(item.href + '/');
                       return (
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 ${
                             isItemActive
-                              ? 'bg-gray-700 text-white'
-                              : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                              ? 'bg-indigo-600/20 text-indigo-400 font-medium'
+                              : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                           }`}
                         >
                           <item.icon className="h-4 w-4" />
@@ -243,46 +251,44 @@ export default function Sidebar() {
                       );
                     })}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
 
-          {/* Divider */}
-          <div className="my-3 border-t border-gray-700" />
+          {/* Section Label */}
+          <div className="mt-6 mb-2 px-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Content</p>
+          </div>
 
           {/* Banners Dropdown */}
-          <div>
+          <div className="space-y-1">
             <button
               onClick={() => toggleCategory('banners')}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`group flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                 isBannerActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Image className="h-5 w-5" />
+                <Image className={`h-5 w-5 transition-transform duration-200 ${!isBannerActive ? 'group-hover:scale-110' : ''}`} />
                 Banners
               </div>
-              {openCategories['banners'] ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openCategories['banners'] ? 'rotate-0' : '-rotate-90'}`} />
             </button>
-            {openCategories['banners'] && (
-              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-4">
+            <div className={`overflow-hidden transition-all duration-200 ${openCategories['banners'] ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="ml-4 space-y-0.5 border-l-2 border-slate-700/50 pl-4 py-1">
                 {bannerSubItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                      className={`block rounded-lg px-3 py-2 text-sm transition-all duration-150 ${
                         isActive
-                          ? 'bg-gray-700 text-white'
-                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                          ? 'bg-indigo-600/20 text-indigo-400 font-medium'
+                          : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
                       {item.label}
@@ -290,7 +296,7 @@ export default function Sidebar() {
                   );
                 })}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Other nav items */}
@@ -300,13 +306,13 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                    : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                 }`}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className={`h-5 w-5 transition-transform duration-200 ${!isActive ? 'group-hover:scale-110' : ''}`} />
                 {item.label}
               </Link>
             );
@@ -314,21 +320,21 @@ export default function Sidebar() {
         </nav>
 
         {/* User section */}
-        <div className="border-t border-gray-800 p-4">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold">
+        <div className="border-t border-slate-800/50 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-xl bg-slate-800/50 p-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold shadow-lg">
               {user?.displayName?.[0]?.toUpperCase() || 'A'}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium">{user?.displayName || 'Admin'}</p>
-              <p className="truncate text-xs text-gray-400">{user?.email}</p>
+              <p className="truncate text-sm font-medium text-white">{user?.displayName || 'Admin'}</p>
+              <p className="truncate text-xs text-slate-400">{user?.email}</p>
             </div>
           </div>
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+            className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
             Sign Out
           </button>
         </div>
