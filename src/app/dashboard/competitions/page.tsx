@@ -222,6 +222,11 @@ export default function CompetitionsPage() {
     setUploadingBanner(true);
     try {
       const fileName = `competition_banners/${Date.now()}_${file.name}`;
+      if (!storage) {
+        console.error('Firebase storage not initialized');
+        setUploadingBanner(false);
+        return;
+      }
       const storageRef = ref(storage, fileName);
       await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(storageRef);

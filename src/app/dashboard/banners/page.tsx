@@ -158,6 +158,11 @@ export default function BannersPage() {
       // Create a unique filename
       const timestamp = Date.now();
       const filename = `banners/hero_${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      if (!storage) {
+        console.error('Firebase storage not initialized');
+        setUploading(false);
+        return;
+      }
       const storageRef = ref(storage, filename);
 
       // Upload file with progress tracking

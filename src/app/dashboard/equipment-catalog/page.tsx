@@ -157,6 +157,10 @@ export default function EquipmentCatalogPage() {
 
   const uploadImages = async (): Promise<string[]> => {
     const urls: string[] = [];
+    if (!storage) {
+      console.error('Firebase storage not initialized');
+      return urls;
+    }
     for (const file of selectedImages) {
       const timestamp = Date.now();
       const fileName = `${timestamp}_${file.name}`;

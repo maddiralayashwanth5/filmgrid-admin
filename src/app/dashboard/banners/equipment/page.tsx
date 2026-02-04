@@ -143,6 +143,11 @@ export default function EquipmentBannersPage() {
     setUploadProgress(0);
 
     const fileName = `equipment_banner_${Date.now()}_${file.name}`;
+    if (!storage) {
+      console.error('Firebase storage not initialized');
+      setUploading(false);
+      return;
+    }
     const storageRef = ref(storage, `equipment_banners/${fileName}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 

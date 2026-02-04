@@ -241,6 +241,11 @@ export default function JobsPage() {
     setUploadingImage(true);
     try {
       const fileName = `job_images/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      if (!storage) {
+        console.error('Firebase storage not initialized');
+        setUploadingImage(false);
+        return;
+      }
       const storageRef = ref(storage, fileName);
       await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(storageRef);

@@ -159,6 +159,10 @@ export default function EquipmentPage() {
   // Upload images to Firebase Storage
   const uploadImages = async (category: string): Promise<string[]> => {
     const urls: string[] = [];
+    if (!storage) {
+      console.error('Firebase storage not initialized');
+      return urls;
+    }
     const categoryFolder = category.toLowerCase().replace(/\s+/g, '_');
 
     for (const file of selectedImages) {
