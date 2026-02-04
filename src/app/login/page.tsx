@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sparkles, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,10 +40,14 @@ export default function LoginPage() {
         </div>
         
         <div className="relative z-10 flex flex-col justify-center px-16">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
+          <div className="flex items-center gap-4 mb-8">
+            <Image 
+              src="/logo.svg" 
+              alt="FilmGrid Logo" 
+              width={56} 
+              height={56}
+              className="rounded-xl"
+            />
             <div>
               <h1 className="text-2xl font-bold text-white">FilmGrid</h1>
               <p className="text-sm text-indigo-300">Admin Panel</p>
@@ -59,17 +64,6 @@ export default function LoginPage() {
           <p className="text-lg text-slate-400 max-w-md">
             Access powerful tools to manage equipment, users, bookings, and more from one centralized dashboard.
           </p>
-          
-          <div className="mt-12 grid grid-cols-2 gap-6">
-            <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4">
-              <p className="text-3xl font-bold text-white">10K+</p>
-              <p className="text-sm text-slate-400">Active Users</p>
-            </div>
-            <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4">
-              <p className="text-3xl font-bold text-white">5K+</p>
-              <p className="text-sm text-slate-400">Equipment Listed</p>
-            </div>
-          </div>
         </div>
       </div>
       
@@ -78,9 +72,13 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
+            <Image 
+              src="/logo.svg" 
+              alt="FilmGrid Logo" 
+              width={40} 
+              height={40}
+              className="rounded-xl"
+            />
             <h1 className="text-xl font-bold text-gray-900">FilmGrid Admin</h1>
           </div>
           
