@@ -155,13 +155,6 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
-          
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Need help? Contact{' '}
-            <a href="mailto:help@filmgrid.com" className="text-indigo-600 hover:text-indigo-500 font-medium">
-              help@filmgrid.com
-            </a>
-          </p>
         </div>
       </div>
     </div>
