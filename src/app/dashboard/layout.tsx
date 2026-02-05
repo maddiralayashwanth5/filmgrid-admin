@@ -69,6 +69,15 @@ const menuItems = [
   { title: 'Audit Logs', href: '/dashboard/logs', icon: History },
 ];
 
+const getAdminDisplayName = (email: string | null | undefined): string => {
+  if (!email) return 'Admin';
+  const adminNames: Record<string, string> = {
+    'yashwanthmaddirala@gmail.com': 'Yash',
+    'cinepro.online@gmail.com': 'Cinepro',
+  };
+  return adminNames[email] || 'Admin';
+};
+
 export default function DashboardLayout({
   children,
 }: {
@@ -156,10 +165,10 @@ export default function DashboardLayout({
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white">
-                  {user?.displayName?.[0]?.toUpperCase() || 'A'}
+                  {getAdminDisplayName(user?.email)?.[0]?.toUpperCase() || 'A'}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{user?.displayName || 'Admin'}</p>
+                  <p className="text-sm font-medium text-gray-900">{getAdminDisplayName(user?.email)}</p>
                   <p className="text-xs text-gray-500">{user?.email}</p>
                 </div>
               </div>
