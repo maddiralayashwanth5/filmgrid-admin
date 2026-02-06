@@ -116,6 +116,8 @@ export default function StoreCataloguePage() {
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<StoreItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sizeFilter, setSizeFilter] = useState<string>('all');
+  const [showSizeDropdown, setShowSizeDropdown] = useState(false);
   
   // Excel upload state
   const excelInputRef = useRef<HTMLInputElement>(null);
@@ -580,6 +582,19 @@ export default function StoreCataloguePage() {
     XLSX.writeFile(wb, `store_catalogue_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
+  // Helper: extract dimensions from title (e.g. "8x8", "12 X 12")
+  const dimRegex = /(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/;
+  const sizeStripRegex = /[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi;
+
+  const extractSize = (title: string): string | null => {
+    const match = dimRegex.exec(title);
+    return match ? `${match[1]} x ${match[2]} ft` : null;
+  };
+
+  const getBaseName = (title: string): string => {
+    return title.replace(sizeStripRegex, '').trim().toUpperCase();
+  };
+
   // Filter items
   const filteredItems = items.filter((item) => {
     const matchesSearch = 
@@ -590,6 +605,51 @@ export default function StoreCataloguePage() {
     const matchesType = activeTab === 'all' || item.itemType === activeTab;
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  // Collect available sizes from filtered items
+  const availableSizes: string[] = (() => {
+    const sizes = new Set<string>();
+    for (const item of filteredItems) {
+      const size = extractSize(item.title);
+      if (size) sizes.add(size);
+    }
+    return Array.from(sizes).sort();
+  })();
+
+  // Apply size filter to items before grouping
+  const sizeFilteredItems = sizeFilter === 'all'
+    ? filteredItems
+    : filteredItems.filter((item) => {
+        const size = extractSize(item.title);
+        return size === sizeFilter;
+      });
+
+  // Group items by base name + seller (only if they have dimensions)
+  interface GroupedItem {
+    baseName: string;
+    displayTitle: string;
+    variants: StoreItem[];
+  }
+
+  const groupedItems: GroupedItem[] = (() => {
+    const groups = new Map<string, StoreItem[]>();
+    for (const item of sizeFilteredItems) {
+      const hasDim = dimRegex.test(item.title);
+      const baseName = getBaseName(item.title);
+      const key = hasDim ? `${baseName}||${item.sellerName}` : `UNIQUE_${item.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    }
+    return Array.from(groups.values()).map((variants) => {
+      const first = variants[0];
+      const hasSizes = variants.length > 1;
+      return {
+        baseName: getBaseName(first.title),
+        displayTitle: hasSizes ? first.title.replace(sizeStripRegex, '').trim() : first.title,
+        variants,
+      };
+    });
+  })();
 
   // Stats
   const stats = {
@@ -774,6 +834,72 @@ export default function StoreCataloguePage() {
         </div>
       </div>
 
+      {/* Size Filter - shown when there are items with sizes */}
+      {availableSizes.length > 0 && (
+        <div className="relative inline-block">
+          <button
+            onClick={() => setShowSizeDropdown(!showSizeDropdown)}
+            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+              sizeFilter !== 'all'
+                ? 'border-purple-300 bg-purple-50 text-purple-700'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <Filter className="h-4 w-4" />
+            {sizeFilter === 'all' ? 'Filter by Size' : sizeFilter}
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {sizeFilter !== 'all' && (
+            <button
+              onClick={() => setSizeFilter('all')}
+              className="ml-2 rounded-full bg-purple-100 p-1 text-purple-600 hover:bg-purple-200"
+              title="Clear size filter"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {showSizeDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowSizeDropdown(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-lg border bg-white py-2 shadow-xl">
+                <label
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-gray-50"
+                  onClick={() => { setSizeFilter('all'); setShowSizeDropdown(false); }}
+                >
+                  <input
+                    type="radio"
+                    name="sizeFilter"
+                    checked={sizeFilter === 'all'}
+                    onChange={() => {}}
+                    className="h-4 w-4 accent-purple-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700">All Sizes</span>
+                </label>
+                <div className="my-1 border-t" />
+                {availableSizes.map((size) => (
+                  <label
+                    key={size}
+                    className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-gray-50"
+                    onClick={() => { setSizeFilter(size); setShowSizeDropdown(false); }}
+                  >
+                    <input
+                      type="radio"
+                      name="sizeFilter"
+                      checked={sizeFilter === size}
+                      onChange={() => {}}
+                      className="h-4 w-4 accent-purple-600"
+                    />
+                    <span className="text-sm text-gray-700">{size}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         <table className="w-full">
@@ -800,113 +926,171 @@ export default function StoreCataloguePage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredItems.length === 0 ? (
+            {groupedItems.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                   No items found
                 </td>
               </tr>
             ) : (
-              filteredItems.map((item) => (
-                <tr
-                  key={item.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => setSelectedItem(item)}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-12 w-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
-                          <ImageIcon className="h-6 w-6 text-gray-400" />
+              groupedItems.map((group) => {
+                const item = group.variants[0];
+                const hasSizes = group.variants.length > 1;
+                return (
+                  <tr
+                    key={item.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => setSelectedItem(item)}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="h-12 w-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{group.displayTitle}</p>
+                          {hasSizes ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {group.variants.map((v) => (
+                                <span
+                                  key={v.id}
+                                  className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"
+                                >
+                                  {extractSize(v.title) || v.title}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500">{item.sellerName}</p>
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-gray-900">{item.title}</p>
-                        <p className="text-xs text-gray-500">{item.condition}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                      item.itemType === 'equipment' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {item.itemType === 'equipment' ? 'Equipment' : 'Non-Equipment'}
-                    </span>
-                    <p className="mt-1 text-sm text-gray-600">{item.category}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-900">{item.sellerName}</p>
-                    <p className="text-xs text-gray-500">{item.sellerFgId || item.sellerId?.slice(0, 8)}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-green-600">₹{item.price.toLocaleString()}</p>
-                  </td>
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={item.status}
-                      onChange={(e) => {
-                        const newStatus = e.target.value as ItemStatus;
-                        if (newStatus === 'rejected') {
-                          const reason = prompt('Rejection reason:');
-                          if (reason) handleStatusChange(item.id, newStatus, reason, item.source);
-                        } else {
-                          handleStatusChange(item.id, newStatus, undefined, item.source);
-                        }
-                      }}
-                      className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${statusColors[item.status]}`}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="sold">Sold</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowMenu(showMenu === item.id ? null : item.id)}
-                        className="rounded p-1 hover:bg-gray-100"
-                      >
-                        <MoreVertical className="h-5 w-5 text-gray-500" />
-                      </button>
-                      {showMenu === item.id && (
-                        <div className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-lg border bg-white py-1 shadow-xl">
-                          <button
-                            onClick={() => {
-                              handleOpenForm(item);
-                              setShowMenu(null);
-                            }}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
-                          >
-                            <Edit className="h-4 w-4" /> Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setShowMenu(null);
-                            }}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
-                          >
-                            <Eye className="h-4 w-4" /> View Details
-                          </button>
-                          <button
-                            onClick={() => handleDeleteItem(item.id, item.source)}
-                            className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                        item.itemType === 'equipment' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.itemType === 'equipment' ? 'Equipment' : 'Non-Equipment'}
+                      </span>
+                      <p className="mt-1 text-sm text-gray-600">{item.category}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900">{item.sellerName}</p>
+                      <p className="text-xs text-gray-500">{item.sellerFgId || item.sellerId?.slice(0, 8)}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {hasSizes ? (
+                        <div className="space-y-0.5">
+                          {group.variants.map((v) => (
+                            <p key={v.id} className="text-xs">
+                              <span className="text-gray-500">{extractSize(v.title) || 'Default'}:</span>{' '}
+                              <span className="font-medium text-green-600">₹{v.price.toLocaleString()}</span>
+                            </p>
+                          ))}
                         </div>
+                      ) : (
+                        <p className="font-medium text-green-600">₹{item.price.toLocaleString()}</p>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      {hasSizes ? (
+                        <div className="space-y-1">
+                          {group.variants.map((v) => (
+                            <select
+                              key={v.id}
+                              value={v.status}
+                              onChange={(e) => {
+                                const newStatus = e.target.value as ItemStatus;
+                                if (newStatus === 'rejected') {
+                                  const reason = prompt('Rejection reason:');
+                                  if (reason) handleStatusChange(v.id, newStatus, reason, v.source);
+                                } else {
+                                  handleStatusChange(v.id, newStatus, undefined, v.source);
+                                }
+                              }}
+                              className={`block w-full rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${statusColors[v.status]}`}
+                              title={extractSize(v.title) || v.title}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="approved">Approved</option>
+                              <option value="rejected">Rejected</option>
+                              <option value="sold">Sold</option>
+                            </select>
+                          ))}
+                        </div>
+                      ) : (
+                        <select
+                          value={item.status}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as ItemStatus;
+                            if (newStatus === 'rejected') {
+                              const reason = prompt('Rejection reason:');
+                              if (reason) handleStatusChange(item.id, newStatus, reason, item.source);
+                            } else {
+                              handleStatusChange(item.id, newStatus, undefined, item.source);
+                            }
+                          }}
+                          className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${statusColors[item.status]}`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="sold">Sold</option>
+                        </select>
+                      )}
+                    </td>
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowMenu(showMenu === item.id ? null : item.id)}
+                          className="rounded p-1 hover:bg-gray-100"
+                        >
+                          <MoreVertical className="h-5 w-5 text-gray-500" />
+                        </button>
+                        {showMenu === item.id && (
+                          <div className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-lg border bg-white py-1 shadow-xl">
+                            <button
+                              onClick={() => {
+                                handleOpenForm(item);
+                                setShowMenu(null);
+                              }}
+                              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
+                            >
+                              <Edit className="h-4 w-4" /> Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setShowMenu(null);
+                              }}
+                              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
+                            >
+                              <Eye className="h-4 w-4" /> View Details
+                            </button>
+                            {group.variants.map((v) => (
+                              <button
+                                key={v.id}
+                                onClick={() => handleDeleteItem(v.id, v.source)}
+                                className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" /> Delete {hasSizes ? (extractSize(v.title) || v.title) : ''}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -974,6 +1158,64 @@ export default function StoreCataloguePage() {
                   </select>
                 </div>
               </div>
+
+              {/* Size selector for Diffusion Materials */}
+              {formData.category === 'Diffusion Materials' && (() => {
+                const diffusionSizes = (() => {
+                  const sizes = new Set<string>();
+                  for (const item of items) {
+                    if (item.category === 'Diffusion Materials') {
+                      const size = extractSize(item.title);
+                      if (size) sizes.add(size);
+                    }
+                  }
+                  return Array.from(sizes).sort();
+                })();
+                const allOptions = [...diffusionSizes, 'Half Roll', 'Full Roll'];
+                // Determine currently selected size from title
+                const currentSize = (() => {
+                  if (formData.title.toLowerCase().includes('half roll')) return 'Half Roll';
+                  if (formData.title.toLowerCase().includes('full roll')) return 'Full Roll';
+                  const match = dimRegex.exec(formData.title);
+                  return match ? `${match[1]} x ${match[2]} ft` : '';
+                })();
+
+                const handleSizeSelect = (size: string) => {
+                  // Strip any existing size/roll suffix from title
+                  let baseTitle = formData.title
+                    .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
+                    .replace(/\s*(half roll|full roll)\s*/gi, '')
+                    .trim();
+                  if (size) {
+                    const suffix = size === 'Half Roll' || size === 'Full Roll' ? size : `(${size.replace(' ft', '')})`;
+                    baseTitle = `${baseTitle} ${suffix}`;
+                  }
+                  setFormData({ ...formData, title: baseTitle });
+                };
+
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Size</label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {allOptions.map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleSizeSelect(currentSize === size ? '' : size)}
+                          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                            currentSize === size
+                              ? 'border-purple-600 bg-purple-600 text-white'
+                              : 'border-gray-300 bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">Select a size to append it to the title</p>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1172,6 +1414,35 @@ export default function StoreCataloguePage() {
                 <h3 className="text-lg font-bold">{selectedItem.title}</h3>
                 <p className="text-gray-600">{selectedItem.description}</p>
               </div>
+
+              {/* Available Sizes */}
+              {(() => {
+                const baseName = getBaseName(selectedItem.title);
+                const sizeGroup = groupedItems.find(g => g.baseName === baseName && g.variants.some(v => v.sellerName === selectedItem.sellerName));
+                if (sizeGroup && sizeGroup.variants.length > 1) {
+                  return (
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+                      <h4 className="mb-2 text-sm font-semibold text-purple-700">Available Sizes</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {sizeGroup.variants.map((v) => (
+                          <button
+                            key={v.id}
+                            onClick={() => setSelectedItem(v)}
+                            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                              v.id === selectedItem.id
+                                ? 'border-purple-600 bg-purple-600 text-white'
+                                : 'border-purple-300 bg-white text-purple-700 hover:bg-purple-100'
+                            }`}
+                          >
+                            {extractSize(v.title) || 'Default'} — ₹{v.price.toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-green-50 p-4">
