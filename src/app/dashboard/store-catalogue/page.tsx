@@ -988,13 +988,9 @@ export default function StoreCataloguePage() {
                     </td>
                     <td className="px-6 py-4">
                       {hasSizes ? (
-                        <div className="space-y-0.5">
-                          {group.variants.map((v) => (
-                            <p key={v.id} className="text-xs">
-                              <span className="text-gray-500">{extractSize(v.title) || 'Default'}:</span>{' '}
-                              <span className="font-medium text-green-600">₹{v.price.toLocaleString()}</span>
-                            </p>
-                          ))}
+                        <div>
+                          <p className="font-medium text-green-600">₹{Math.min(...group.variants.map(v => v.price)).toLocaleString()} – ₹{Math.max(...group.variants.map(v => v.price)).toLocaleString()}</p>
+                          <p className="text-[10px] text-gray-400">{group.variants.length} sizes</p>
                         </div>
                       ) : (
                         <p className="font-medium text-green-600">₹{item.price.toLocaleString()}</p>
@@ -1002,30 +998,31 @@ export default function StoreCataloguePage() {
                     </td>
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       {hasSizes ? (
-                        <div className="space-y-1">
-                          {group.variants.map((v) => (
-                            <select
-                              key={v.id}
-                              value={v.status}
-                              onChange={(e) => {
-                                const newStatus = e.target.value as ItemStatus;
-                                if (newStatus === 'rejected') {
-                                  const reason = prompt('Rejection reason:');
-                                  if (reason) handleStatusChange(v.id, newStatus, reason, v.source);
-                                } else {
-                                  handleStatusChange(v.id, newStatus, undefined, v.source);
-                                }
-                              }}
-                              className={`block w-full rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${statusColors[v.status]}`}
-                              title={extractSize(v.title) || v.title}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="approved">Approved</option>
-                              <option value="rejected">Rejected</option>
-                              <option value="sold">Sold</option>
-                            </select>
-                          ))}
-                        </div>
+                        <select
+                          value={group.variants.every(v => v.status === group.variants[0].status) ? group.variants[0].status : 'mixed' as string}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as ItemStatus;
+                            if (newStatus === 'mixed' as string) return;
+                            const reason = newStatus === 'rejected' ? prompt('Rejection reason:') : undefined;
+                            if (newStatus === 'rejected' && !reason) return;
+                            for (const v of group.variants) {
+                              handleStatusChange(v.id, newStatus, reason, v.source);
+                            }
+                          }}
+                          className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none ${
+                            group.variants.every(v => v.status === group.variants[0].status)
+                              ? statusColors[group.variants[0].status]
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {!group.variants.every(v => v.status === group.variants[0].status) && (
+                            <option value="mixed" disabled>Mixed</option>
+                          )}
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="sold">Sold</option>
+                        </select>
                       ) : (
                         <select
                           value={item.status}
