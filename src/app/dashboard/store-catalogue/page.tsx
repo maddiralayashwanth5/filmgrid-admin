@@ -281,11 +281,20 @@ export default function StoreCataloguePage() {
 
   const uploadImage = async (file: File): Promise<string> => {
     if (!storage) throw new Error('Storage not initialized');
+    
+    // Sanitize filename - remove special characters
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
     const timestamp = Date.now();
-    const fileName = `store-items/${timestamp}_${file.name}`;
+    const fileName = `store-items/${timestamp}_${sanitizedName}`;
     const storageRef = ref(storage, fileName);
+    
+    console.log('Uploading to:', fileName);
+    console.log('User authenticated:', !!user);
+    
     await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
+    const url = await getDownloadURL(storageRef);
+    console.log('Upload successful, URL:', url);
+    return url;
   };
 
   const handleSaveItem = async () => {
