@@ -20,7 +20,7 @@ const db: Firestore = getFirestore(app);
 // Only initialize storage on client side
 let storage: FirebaseStorage | undefined;
 if (typeof window !== 'undefined') {
-  storage = getStorage(app);
+  storage = getStorage(app, `gs://${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}`);
 }
 
 export { auth, db, storage };
