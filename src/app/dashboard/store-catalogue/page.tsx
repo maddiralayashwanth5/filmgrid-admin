@@ -1063,15 +1063,19 @@ export default function StoreCataloguePage() {
                             >
                               <Eye className="h-4 w-4" /> View Details
                             </button>
-                            {group.variants.map((v) => (
-                              <button
-                                key={v.id}
-                                onClick={() => handleDeleteItem(v.id, v.source)}
-                                className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" /> Delete {hasSizes ? (extractSize(v.title) || v.title) : ''}
-                              </button>
-                            ))}
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete ${hasSizes ? `all ${group.variants.length} size variants of "${group.displayTitle}"` : `"${item.title}"`}?`)) {
+                                  for (const v of group.variants) {
+                                    handleDeleteItem(v.id, v.source);
+                                  }
+                                }
+                                setShowMenu(null);
+                              }}
+                              className="flex w-full items-center gap-2 border-t px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete{hasSizes ? ` (${group.variants.length} sizes)` : ''}
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1147,7 +1151,7 @@ export default function StoreCataloguePage() {
                 </div>
               </div>
 
-              {/* Size selector for Diffusion Materials */}
+              {/* Size selector for Diffusion Materials - multi-select */}
               {formData.category === 'Diffusion Materials' && (() => {
                 const diffusionSizes = (() => {
                   const sizes = new Set<string>();
@@ -1160,47 +1164,65 @@ export default function StoreCataloguePage() {
                   return Array.from(sizes).sort();
                 })();
                 const allOptions = [...diffusionSizes, 'Half Roll', 'Full Roll'];
-                // Determine currently selected size from title
-                const currentSize = (() => {
-                  if (formData.title.toLowerCase().includes('half roll')) return 'Half Roll';
-                  if (formData.title.toLowerCase().includes('full roll')) return 'Full Roll';
-                  const match = dimRegex.exec(formData.title);
-                  return match ? `${match[1]} x ${match[2]} ft` : '';
-                })();
+                // Determine currently selected sizes from title
+                const selectedSizes = allOptions.filter((size) => {
+                  if (size === 'Half Roll') return formData.title.toLowerCase().includes('half roll');
+                  if (size === 'Full Roll') return formData.title.toLowerCase().includes('full roll');
+                  const dimPart = size.replace(' ft', '').replace(' x ', '\\s*[xX×]\\s*');
+                  return new RegExp(dimPart, 'i').test(formData.title);
+                });
 
-                const handleSizeSelect = (size: string) => {
-                  // Strip any existing size/roll suffix from title
-                  let baseTitle = formData.title
+                const handleSizeToggle = (size: string) => {
+                  const isSelected = selectedSizes.includes(size);
+                  let newSelected: string[];
+                  if (isSelected) {
+                    newSelected = selectedSizes.filter(s => s !== size);
+                  } else {
+                    newSelected = [...selectedSizes, size];
+                  }
+                  // Rebuild title: base name + all selected sizes
+                  const baseTitle = formData.title
                     .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
                     .replace(/\s*(half roll|full roll)\s*/gi, '')
                     .trim();
-                  if (size) {
-                    const suffix = size === 'Half Roll' || size === 'Full Roll' ? size : `(${size.replace(' ft', '')})`;
-                    baseTitle = `${baseTitle} ${suffix}`;
+                  if (newSelected.length === 0) {
+                    setFormData({ ...formData, title: baseTitle });
+                  } else {
+                    const suffixes = newSelected.map(s =>
+                      s === 'Half Roll' || s === 'Full Roll' ? s : `(${s.replace(' ft', '')})`
+                    );
+                    setFormData({ ...formData, title: `${baseTitle} ${suffixes.join(', ')}` });
                   }
-                  setFormData({ ...formData, title: baseTitle });
                 };
 
                 return (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Size</label>
+                    <label className="block text-sm font-medium text-gray-700">Sizes</label>
+                    <p className="mt-0.5 text-xs text-gray-400">Select multiple sizes to include</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {allOptions.map((size) => (
-                        <button
-                          key={size}
-                          type="button"
-                          onClick={() => handleSizeSelect(currentSize === size ? '' : size)}
-                          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                            currentSize === size
-                              ? 'border-purple-600 bg-purple-600 text-white'
-                              : 'border-gray-300 bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300'
-                          }`}
-                        >
-                          {size}
-                        </button>
-                      ))}
+                      {allOptions.map((size) => {
+                        const isChecked = selectedSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => handleSizeToggle(size)}
+                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                              isChecked
+                                ? 'border-purple-600 bg-purple-600 text-white'
+                                : 'border-gray-300 bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300'
+                            }`}
+                          >
+                            {isChecked ? (
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            ) : (
+                              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" strokeWidth={2} /></svg>
+                            )}
+                            {size}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">Select a size to append it to the title</p>
                   </div>
                 );
               })()}
