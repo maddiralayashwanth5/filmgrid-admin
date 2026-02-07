@@ -417,6 +417,32 @@ export const toggleUserBan = async (userId: string, isBanned: boolean) => {
     isBanned,
     updatedAt: Timestamp.now(),
   });
+
+  // When banning, suspend all their sales items; when unbanning, restore them
+  const newStatus = isBanned ? 'suspended' : 'approved';
+  const targetStatus = isBanned ? 'approved' : 'suspended';
+
+  // Update sales_items
+  const salesQuery = query(
+    collection(db, 'sales_items'),
+    where('sellerId', '==', userId),
+    where('status', '==', targetStatus),
+  );
+  const salesSnap = await getDocs(salesQuery);
+  for (const d of salesSnap.docs) {
+    await updateDoc(d.ref, { status: newStatus, updatedAt: Timestamp.now() });
+  }
+
+  // Update used_gear
+  const gearQuery = query(
+    collection(db, 'used_gear'),
+    where('sellerId', '==', userId),
+    where('status', '==', targetStatus),
+  );
+  const gearSnap = await getDocs(gearQuery);
+  for (const d of gearSnap.docs) {
+    await updateDoc(d.ref, { status: newStatus, updatedAt: Timestamp.now() });
+  }
 };
 
 export const deleteUser = async (userId: string) => {
