@@ -613,40 +613,40 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+      <div className="mb-6">
+        <div className="mb-3">
           <h1 className="text-2xl font-bold text-gray-900">Users & Verification</h1>
           <p className="text-gray-600">Manage users and role verification requests</p>
         </div>
         {activeTab === 'users' && (
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={exportUsersToExcel}
-              className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700"
             >
               <Download className="h-4 w-4" />
-              Export Excel
+              Export
             </button>
             <button
               onClick={handleOpenDuplicatesModal}
-              className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+              className="flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-orange-700"
             >
               <Copy className="h-4 w-4" />
-              Find Duplicates
+              Duplicates
             </button>
             <button
               onClick={() => setShowResetAllModal(true)}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-red-700"
             >
-              Reset All Verifications
+              Reset All
             </button>
           </div>
         )}
       </div>
 
       {/* Main Tabs */}
-      <div className="mb-6 border-b">
-        <div className="flex gap-1">
+      <div className="mb-6 border-b overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
           <button
             onClick={() => { setActiveTab('users'); setCurrentPage(1); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -809,8 +809,8 @@ export default function UsersPage() {
           </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-white shadow-sm">
-        <table className="w-full">
+      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-gray-50">
             <tr>
               {columns.map((column) => (
