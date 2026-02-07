@@ -1003,7 +1003,7 @@ export default function StoreCataloguePage() {
                           onChange={(e) => {
                             const newStatus = e.target.value as ItemStatus;
                             if (newStatus === 'mixed' as string) return;
-                            const reason = newStatus === 'rejected' ? prompt('Rejection reason:') : undefined;
+                            const reason = newStatus === 'rejected' ? prompt('Rejection reason:') ?? undefined : undefined;
                             if (newStatus === 'rejected' && !reason) return;
                             for (const v of group.variants) {
                               handleStatusChange(v.id, newStatus, reason, v.source);
