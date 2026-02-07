@@ -296,6 +296,18 @@ export const approveRoleVerification = async (
       updatedAt: Timestamp.now(),
     });
 
+    // Restore any suspended sales items from this store
+    const salesQ = query(collection(db, 'sales_items'), where('sellerId', '==', request.userId), where('status', '==', 'suspended'));
+    const salesSnap = await getDocs(salesQ);
+    for (const d of salesSnap.docs) {
+      await updateDoc(d.ref, { status: 'approved', updatedAt: Timestamp.now() });
+    }
+    const gearQ = query(collection(db, 'used_gear'), where('sellerId', '==', request.userId), where('status', '==', 'suspended'));
+    const gearSnap = await getDocs(gearQ);
+    for (const d of gearSnap.docs) {
+      await updateDoc(d.ref, { status: 'approved', updatedAt: Timestamp.now() });
+    }
+
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
       type: 'roleVerified',
@@ -365,6 +377,18 @@ export const rejectRoleVerification = async (
       'storeVerification.rejectionNotes': notes,
       updatedAt: Timestamp.now(),
     });
+
+    // Suspend all approved sales items from this store
+    const salesQ = query(collection(db, 'sales_items'), where('sellerId', '==', request.userId), where('status', '==', 'approved'));
+    const salesSnap = await getDocs(salesQ);
+    for (const d of salesSnap.docs) {
+      await updateDoc(d.ref, { status: 'suspended', updatedAt: Timestamp.now() });
+    }
+    const gearQ = query(collection(db, 'used_gear'), where('sellerId', '==', request.userId), where('status', '==', 'approved'));
+    const gearSnap = await getDocs(gearQ);
+    for (const d of gearSnap.docs) {
+      await updateDoc(d.ref, { status: 'suspended', updatedAt: Timestamp.now() });
+    }
 
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
