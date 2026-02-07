@@ -958,16 +958,7 @@ export default function StoreCataloguePage() {
                         <div>
                           <p className="font-medium text-gray-900">{group.displayTitle}</p>
                           {hasSizes ? (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {group.variants.map((v) => (
-                                <span
-                                  key={v.id}
-                                  className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"
-                                >
-                                  {extractSize(v.title) || v.title}
-                                </span>
-                              ))}
-                            </div>
+                            <p className="mt-0.5 text-xs text-purple-600">{group.variants.length} sizes available</p>
                           ) : (
                             <p className="text-xs text-gray-500">{item.sellerName}</p>
                           )}
@@ -975,12 +966,12 @@ export default function StoreCataloguePage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                      <span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
                         item.itemType === 'equipment' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
                       }`}>
-                        {item.itemType === 'equipment' ? 'Equipment' : 'Non-Equipment'}
+                        {item.itemType === 'equipment' ? 'Equipment' : 'Non-Equip.'}
                       </span>
-                      <p className="mt-1 text-sm text-gray-600">{item.category}</p>
+                      <p className="mt-1 text-sm text-gray-600 whitespace-nowrap">{item.category}</p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{item.sellerName}</p>
