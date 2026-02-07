@@ -23,7 +23,7 @@ export default function SettingsPage() {
   // General settings
   const [settings, setSettings] = useState({
     siteName: 'FilmGrid',
-    supportEmail: 'support@filmgrid.com',
+    supportEmail: 'help@filmgrid.app',
     maxEquipmentPerUser: 50,
     defaultBookingDuration: 7,
     autoExpireOpenOrders: 24,

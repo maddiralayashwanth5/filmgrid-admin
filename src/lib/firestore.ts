@@ -739,7 +739,7 @@ export const verifyEquipment = async (
     const title = approved ? 'Equipment Approved! 🎉' : 'Equipment Not Approved';
     const body = approved 
       ? `Your ${equipmentData.title || equipmentData.name || 'equipment'} has been verified and is now live on FilmGrid!`
-      : `Your ${equipmentData.title || equipmentData.name || 'equipment'} was not approved.${notes ? ` Reason: ${notes}` : ' Please contact support at help@filmgrid.com for more details.'}`;
+      : `Your ${equipmentData.title || equipmentData.name || 'equipment'} was not approved.${notes ? ` Reason: ${notes}` : ' Please contact support at help@filmgrid.app for more details.'}`;
     
     await addDoc(collection(db, 'notifications'), {
       userId: equipmentData.ownerId,

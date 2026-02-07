@@ -111,7 +111,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     className="block w-full rounded-xl border border-gray-200 bg-gray-50 pl-12 pr-4 py-3.5 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
-                    placeholder="admin@filmgrid.com"
+                    placeholder="admin@filmgrid.app"
                   />
                 </div>
               </div>
