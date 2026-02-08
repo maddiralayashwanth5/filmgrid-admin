@@ -1465,14 +1465,18 @@ export default function StoreCataloguePage() {
                         const isSelected = size in formSizePrices;
                         return (
                           <div key={size} className="flex items-center gap-3">
-                            <button
-                              type="button"
+                            <label
+                              className="flex items-center gap-2 min-w-[140px] cursor-pointer"
                               onClick={() => handleSizeToggle(size)}
-                              className="flex items-center gap-2 min-w-[140px]"
                             >
-                              <span className={`inline-block h-4 w-4 rounded-sm ${isSelected ? 'bg-green-500' : 'bg-red-500'}`} />
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                readOnly
+                                className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer"
+                              />
                               <span className="text-sm font-medium text-gray-700">{size}</span>
-                            </button>
+                            </label>
                             {isSelected ? (
                               <div className="flex items-center rounded-lg border border-gray-300 bg-white">
                                 <span className="pl-2 text-sm text-gray-400">₹</span>
