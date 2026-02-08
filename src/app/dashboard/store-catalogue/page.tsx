@@ -1289,11 +1289,12 @@ export default function StoreCataloguePage() {
               {/* Size selector for Diffusion Materials - multi-select */}
               {formData.category === 'Diffusion Materials' && (() => {
                 const diffusionSizes = (() => {
+                  const excludedSizes = new Set(['2 x 3 ft', '8 x 10 ft']);
                   const sizes = new Set<string>();
                   for (const item of items) {
                     if (item.category === 'Diffusion Materials') {
                       const size = extractSize(item.title);
-                      if (size) sizes.add(size);
+                      if (size && !excludedSizes.has(size)) sizes.add(size);
                     }
                   }
                   return Array.from(sizes).sort((a, b) => {
