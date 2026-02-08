@@ -144,6 +144,9 @@ export default function StoreCataloguePage() {
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({});
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
 
+  // Size pricing for form: { "4 x 4 ft": "6000", "6 x 6 ft": "6000" }
+  const [formSizePrices, setFormSizePrices] = useState<Record<string, string>>({});
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -233,11 +236,28 @@ export default function StoreCataloguePage() {
     };
   }, []);
 
+  // Helper: extract dimensions from title (e.g. "8x8", "12 X 12")
+  const dimRegex = /(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/;
+  const sizeStripRegex = /[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi;
+
+  const extractSize = (title: string): string | null => {
+    const match = dimRegex.exec(title);
+    return match ? `${match[1]} x ${match[2]} ft` : null;
+  };
+
+  const getBaseName = (title: string): string => {
+    return title.replace(sizeStripRegex, '').replace(/[,\s()]+$/g, '').replace(/^[,\s()]+/g, '').trim().toUpperCase();
+  };
+
   const handleOpenForm = (item?: StoreItem) => {
     if (item) {
       setEditingItem(item);
+      // For Diffusion Materials, strip dimensions from title to show clean name
+      const cleanTitle = item.category === 'Diffusion Materials'
+        ? item.title.replace(sizeStripRegex, '').replace(/\s*(half roll|full roll)\s*/gi, '').replace(/,/g, '').trim()
+        : item.title;
       setFormData({
-        title: item.title,
+        title: cleanTitle,
         description: item.description,
         category: item.category,
         itemType: item.itemType || 'equipment',
@@ -251,8 +271,24 @@ export default function StoreCataloguePage() {
         status: item.status,
       });
       setImagePreview(item.imageUrl || null);
+      // Initialize size prices from grouped variants when editing a Diffusion Materials item
+      if (item.category === 'Diffusion Materials') {
+        const baseName = getBaseName(item.title);
+        const relatedItems = items.filter(i => i.category === 'Diffusion Materials' && getBaseName(i.title) === baseName && i.sellerName === item.sellerName);
+        const sp: Record<string, string> = {};
+        for (const ri of relatedItems) {
+          const size = extractSize(ri.title);
+          if (size) sp[size] = ri.price.toString();
+          if (ri.title.toLowerCase().includes('half roll')) sp['Half Roll'] = ri.price.toString();
+          if (ri.title.toLowerCase().includes('full roll')) sp['Full Roll'] = ri.price.toString();
+        }
+        setFormSizePrices(sp);
+      } else {
+        setFormSizePrices({});
+      }
     } else {
       setEditingItem(null);
+      setFormSizePrices({});
       setFormData({
         title: '',
         description: '',
@@ -304,9 +340,20 @@ export default function StoreCataloguePage() {
   };
 
   const handleSaveItem = async () => {
-    if (!formData.title || !formData.category || !formData.price) {
+    const hasSizePrices = formData.category === 'Diffusion Materials' && Object.keys(formSizePrices).length > 0;
+    if (!formData.title || !formData.category || (!hasSizePrices && !formData.price)) {
       alert('Please fill in all required fields');
       return;
+    }
+
+    if (hasSizePrices) {
+      // Validate all size prices
+      for (const [size, price] of Object.entries(formSizePrices)) {
+        if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+          alert(`Please enter a valid price for size: ${size}`);
+          return;
+        }
+      }
     }
 
     setSaving(true);
@@ -328,35 +375,138 @@ export default function StoreCataloguePage() {
         setUploadingImage(false);
       }
 
-      const itemData = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        itemType: formData.itemType,
-        price: parseFloat(formData.price) || 0,
-        condition: formData.condition,
-        location: formData.location,
-        sellerName: formData.sellerName,
-        sellerPhone: formData.sellerPhone,
-        sellerFgId: formData.sellerFgId || null,
-        imageUrl: imageUrl || null,
-        status: formData.status,
-        updatedAt: Timestamp.now(),
-      };
+      // Clean base title (strip any leftover dimensions/commas)
+      const cleanTitle = formData.title
+        .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
+        .replace(/\s*(half roll|full roll)\s*/gi, '')
+        .replace(/,/g, '')
+        .trim();
 
-      if (editingItem) {
-        const collectionName = editingItem.source || 'sales_items';
-        await updateDoc(doc(db, collectionName, editingItem.id), itemData);
+      if (hasSizePrices) {
+        // Create/update separate documents per size
+        if (editingItem) {
+          // Find all existing variants for this product
+          const baseName = getBaseName(editingItem.title);
+          const existingVariants = items.filter(i => 
+            i.category === 'Diffusion Materials' && 
+            getBaseName(i.title) === baseName && 
+            i.sellerName === editingItem.sellerName
+          );
+
+          // Update existing variants and create new ones
+          const processedSizes = new Set<string>();
+          for (const variant of existingVariants) {
+            const size = extractSize(variant.title);
+            const isHalfRoll = variant.title.toLowerCase().includes('half roll');
+            const isFullRoll = variant.title.toLowerCase().includes('full roll');
+            const sizeKey = size || (isHalfRoll ? 'Half Roll' : isFullRoll ? 'Full Roll' : null);
+            
+            if (sizeKey && sizeKey in formSizePrices) {
+              // Update existing variant
+              const collectionName = variant.source || 'sales_items';
+              const sizeLabel = sizeKey === 'Half Roll' || sizeKey === 'Full Roll' ? sizeKey : `(${sizeKey.replace(' ft', '')})`;
+              await updateDoc(doc(db, collectionName, variant.id), {
+                title: `${cleanTitle} ${sizeLabel}`,
+                description: formData.description,
+                category: formData.category,
+                itemType: formData.itemType,
+                price: parseFloat(formSizePrices[sizeKey]) || 0,
+                condition: formData.condition,
+                location: formData.location,
+                sellerName: formData.sellerName,
+                sellerPhone: formData.sellerPhone,
+                sellerFgId: formData.sellerFgId || null,
+                imageUrl: imageUrl || null,
+                status: formData.status,
+                updatedAt: Timestamp.now(),
+              });
+              processedSizes.add(sizeKey);
+            } else if (sizeKey) {
+              // Size was deselected — delete the variant
+              const collectionName = variant.source || 'sales_items';
+              await deleteDoc(doc(db, collectionName, variant.id));
+            }
+          }
+
+          // Create new size variants that didn't exist before
+          for (const [size, price] of Object.entries(formSizePrices)) {
+            if (!processedSizes.has(size)) {
+              const sizeLabel = size === 'Half Roll' || size === 'Full Roll' ? size : `(${size.replace(' ft', '')})`;
+              await addDoc(collection(db, 'sales_items'), {
+                title: `${cleanTitle} ${sizeLabel}`,
+                description: formData.description,
+                category: formData.category,
+                itemType: formData.itemType,
+                price: parseFloat(price) || 0,
+                condition: formData.condition,
+                location: formData.location,
+                sellerName: formData.sellerName,
+                sellerPhone: formData.sellerPhone,
+                sellerFgId: formData.sellerFgId || null,
+                imageUrl: imageUrl || null,
+                status: formData.status,
+                sellerId: user?.uid || 'admin',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+              });
+            }
+          }
+        } else {
+          // Creating new — one doc per size
+          for (const [size, price] of Object.entries(formSizePrices)) {
+            const sizeLabel = size === 'Half Roll' || size === 'Full Roll' ? size : `(${size.replace(' ft', '')})`;
+            await addDoc(collection(db, 'sales_items'), {
+              title: `${cleanTitle} ${sizeLabel}`,
+              description: formData.description,
+              category: formData.category,
+              itemType: formData.itemType,
+              price: parseFloat(price) || 0,
+              condition: formData.condition,
+              location: formData.location,
+              sellerName: formData.sellerName,
+              sellerPhone: formData.sellerPhone,
+              sellerFgId: formData.sellerFgId || null,
+              imageUrl: imageUrl || null,
+              status: formData.status,
+              sellerId: user?.uid || 'admin',
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            });
+          }
+        }
       } else {
-        await addDoc(collection(db, 'sales_items'), {
-          ...itemData,
-          sellerId: user?.uid || 'admin',
-          createdAt: Timestamp.now(),
-        });
+        // Non-size item — single doc
+        const itemData = {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          itemType: formData.itemType,
+          price: parseFloat(formData.price) || 0,
+          condition: formData.condition,
+          location: formData.location,
+          sellerName: formData.sellerName,
+          sellerPhone: formData.sellerPhone,
+          sellerFgId: formData.sellerFgId || null,
+          imageUrl: imageUrl || null,
+          status: formData.status,
+          updatedAt: Timestamp.now(),
+        };
+
+        if (editingItem) {
+          const collectionName = editingItem.source || 'sales_items';
+          await updateDoc(doc(db, collectionName, editingItem.id), itemData);
+        } else {
+          await addDoc(collection(db, 'sales_items'), {
+            ...itemData,
+            sellerId: user?.uid || 'admin',
+            createdAt: Timestamp.now(),
+          });
+        }
       }
 
       setShowForm(false);
       setEditingItem(null);
+      setFormSizePrices({});
     } catch (error: any) {
       console.error('Error saving item:', error);
       alert(`Failed to save item: ${error?.message || error}`);
@@ -585,19 +735,6 @@ export default function StoreCataloguePage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Store Catalogue');
     XLSX.writeFile(wb, `store_catalogue_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-  };
-
-  // Helper: extract dimensions from title (e.g. "8x8", "12 X 12")
-  const dimRegex = /(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/;
-  const sizeStripRegex = /[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi;
-
-  const extractSize = (title: string): string | null => {
-    const match = dimRegex.exec(title);
-    return match ? `${match[1]} x ${match[2]} ft` : null;
-  };
-
-  const getBaseName = (title: string): string => {
-    return title.replace(sizeStripRegex, '').replace(/[,\s()]+$/g, '').replace(/^[,\s()]+/g, '').trim().toUpperCase();
   };
 
   // Filter items
@@ -1286,7 +1423,7 @@ export default function StoreCataloguePage() {
                 </div>
               </div>
 
-              {/* Size selector for Diffusion Materials - multi-select */}
+              {/* Size selector for Diffusion Materials */}
               {formData.category === 'Diffusion Materials' && (() => {
                 const diffusionSizes = (() => {
                   const excludedSizes = new Set(['2 x 3 ft', '8 x 10 ft']);
@@ -1306,64 +1443,53 @@ export default function StoreCataloguePage() {
                   });
                 })();
                 const allOptions = [...diffusionSizes, 'Half Roll', 'Full Roll'];
-                // Determine currently selected sizes from title
-                const selectedSizes = allOptions.filter((size) => {
-                  if (size === 'Half Roll') return formData.title.toLowerCase().includes('half roll');
-                  if (size === 'Full Roll') return formData.title.toLowerCase().includes('full roll');
-                  const dimPart = size.replace(' ft', '').replace(' x ', '\\s*[xX×]\\s*');
-                  return new RegExp(dimPart, 'i').test(formData.title);
-                });
 
                 const handleSizeToggle = (size: string) => {
-                  const isSelected = selectedSizes.includes(size);
-                  let newSelected: string[];
-                  if (isSelected) {
-                    newSelected = selectedSizes.filter(s => s !== size);
-                  } else {
-                    newSelected = [...selectedSizes, size];
-                  }
-                  // Rebuild title: base name + all selected sizes
-                  // Strip dimensions, roll labels, then all commas (commas are only from size concatenation)
-                  const baseTitle = formData.title
-                    .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
-                    .replace(/\s*(half roll|full roll)\s*/gi, '')
-                    .replace(/,/g, '')
-                    .trim();
-                  if (newSelected.length === 0) {
-                    setFormData({ ...formData, title: baseTitle });
-                  } else {
-                    const suffixes = newSelected.map(s =>
-                      s === 'Half Roll' || s === 'Full Roll' ? s : `(${s.replace(' ft', '')})`
-                    );
-                    setFormData({ ...formData, title: `${baseTitle} ${suffixes.join(', ')}` });
-                  }
+                  setFormSizePrices(prev => {
+                    const next = { ...prev };
+                    if (size in next) {
+                      delete next[size];
+                    } else {
+                      next[size] = formData.price || '0';
+                    }
+                    return next;
+                  });
                 };
 
                 return (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Sizes</label>
-                    <p className="mt-0.5 text-xs text-gray-400">Select multiple sizes to include</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <label className="block text-sm font-medium text-gray-700">Sizes & Pricing</label>
+                    <p className="mt-0.5 text-xs text-gray-400">Select sizes and set individual pricing</p>
+                    <div className="mt-2 space-y-1.5">
                       {allOptions.map((size) => {
-                        const isChecked = selectedSizes.includes(size);
+                        const isSelected = size in formSizePrices;
                         return (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => handleSizeToggle(size)}
-                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                              isChecked
-                                ? 'border-purple-600 bg-purple-600 text-white'
-                                : 'border-gray-300 bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300'
-                            }`}
-                          >
-                            {isChecked ? (
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          <div key={size} className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleSizeToggle(size)}
+                              className="flex items-center gap-2 min-w-[140px]"
+                            >
+                              <span className={`inline-block h-4 w-4 rounded-sm ${isSelected ? 'bg-green-500' : 'bg-red-500'}`} />
+                              <span className="text-sm font-medium text-gray-700">{size}</span>
+                            </button>
+                            {isSelected ? (
+                              <div className="flex items-center rounded-lg border border-gray-300 bg-white">
+                                <span className="pl-2 text-sm text-gray-400">₹</span>
+                                <input
+                                  type="number"
+                                  value={formSizePrices[size]}
+                                  onChange={(e) => setFormSizePrices(prev => ({ ...prev, [size]: e.target.value }))}
+                                  className="w-24 border-0 px-2 py-1.5 text-sm font-medium text-gray-900 focus:outline-none rounded-lg"
+                                  placeholder="Price"
+                                />
+                              </div>
                             ) : (
-                              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" strokeWidth={2} /></svg>
+                              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-100">
+                                <span className="px-2 py-1.5 text-sm text-gray-400">Pricing</span>
+                              </div>
                             )}
-                            {size}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1372,6 +1498,7 @@ export default function StoreCataloguePage() {
               })()}
 
               <div className="grid grid-cols-2 gap-4">
+                {!(formData.category === 'Diffusion Materials' && Object.keys(formSizePrices).length > 0) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Price (₹) *</label>
                   <input
@@ -1382,6 +1509,7 @@ export default function StoreCataloguePage() {
                     placeholder="0"
                   />
                 </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Condition</label>
                   <select
