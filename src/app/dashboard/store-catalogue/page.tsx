@@ -646,6 +646,14 @@ export default function StoreCataloguePage() {
       groups.get(key)!.push(item);
     }
     return Array.from(groups.values()).map((variants) => {
+      // Sort variants by dimension area (smallest to largest)
+      variants.sort((a, b) => {
+        const matchA = dimRegex.exec(a.title);
+        const matchB = dimRegex.exec(b.title);
+        const areaA = matchA ? parseFloat(matchA[1]) * parseFloat(matchA[2]) : 0;
+        const areaB = matchB ? parseFloat(matchB[1]) * parseFloat(matchB[2]) : 0;
+        return areaA - areaB;
+      });
       const first = variants[0];
       const hasSizes = variants.length > 1;
       return {
