@@ -597,7 +597,7 @@ export default function StoreCataloguePage() {
   };
 
   const getBaseName = (title: string): string => {
-    return title.replace(sizeStripRegex, '').trim().toUpperCase();
+    return title.replace(sizeStripRegex, '').replace(/[,\s()]+$/g, '').replace(/^[,\s()]+/g, '').trim().toUpperCase();
   };
 
   // Filter items
@@ -650,7 +650,7 @@ export default function StoreCataloguePage() {
       const hasSizes = variants.length > 1;
       return {
         baseName: getBaseName(first.title),
-        displayTitle: hasSizes ? first.title.replace(sizeStripRegex, '').trim() : first.title,
+        displayTitle: hasSizes ? first.title.replace(sizeStripRegex, '').replace(/[,\s()]+$/g, '').replace(/^[,\s()]+/g, '').trim() : first.title,
         variants,
       };
     });
@@ -982,14 +982,136 @@ export default function StoreCataloguePage() {
                       <p className="font-medium text-gray-900">{item.sellerName}</p>
                       <p className="text-xs text-gray-500">{item.sellerFgId || item.sellerId?.slice(0, 8)}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       {hasSizes ? (
                         <div>
-                          <p className="font-medium text-green-600">₹{Math.min(...group.variants.map(v => v.price)).toLocaleString()} – ₹{Math.max(...group.variants.map(v => v.price)).toLocaleString()}</p>
-                          <p className="text-[10px] text-gray-400">{group.variants.length} sizes</p>
+                          {group.variants.map((v) => {
+                            const size = extractSize(v.title) || 'Default';
+                            const editKey = v.id;
+                            const isEditing = editKey in variantPrices;
+                            const isSaving = savingVariantId === v.id;
+                            return (
+                              <div key={v.id} className="flex items-center gap-1.5 py-0.5">
+                                <span className="text-[10px] text-gray-500 w-14 truncate" title={size}>{size.replace(' ft', '')}</span>
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex items-center rounded border border-green-300 bg-white">
+                                      <span className="pl-1 text-xs text-gray-400">₹</span>
+                                      <input
+                                        type="number"
+                                        value={variantPrices[editKey]}
+                                        onChange={(e) => setVariantPrices(prev => ({ ...prev, [editKey]: e.target.value }))}
+                                        className="w-16 border-0 px-1 py-0.5 text-xs font-medium text-gray-900 focus:outline-none"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') {
+                                            setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; });
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <button
+                                      disabled={isSaving}
+                                      onClick={async () => {
+                                        const newPrice = parseFloat(variantPrices[editKey]);
+                                        if (isNaN(newPrice) || newPrice < 0) return;
+                                        setSavingVariantId(v.id);
+                                        try {
+                                          const collectionName = v.source || 'sales_items';
+                                          await updateDoc(doc(db, collectionName, v.id), { price: newPrice, updatedAt: Timestamp.now() });
+                                          setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; });
+                                        } catch (error) {
+                                          console.error('Error updating price:', error);
+                                          alert('Failed to update price');
+                                        } finally {
+                                          setSavingVariantId(null);
+                                        }
+                                      }}
+                                      className="text-green-600 hover:text-green-800"
+                                    >
+                                      {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                                    </button>
+                                    <button
+                                      onClick={() => setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; })}
+                                      className="text-gray-400 hover:text-gray-600"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setVariantPrices(prev => ({ ...prev, [editKey]: v.price.toString() }))}
+                                    className="flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800"
+                                    title="Click to edit price"
+                                  >
+                                    ₹{v.price.toLocaleString()}
+                                    <Edit className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100" />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <p className="font-medium text-green-600">₹{item.price.toLocaleString()}</p>
+                        (() => {
+                          const editKey = item.id;
+                          const isEditing = editKey in variantPrices;
+                          const isSaving = savingVariantId === item.id;
+                          return isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <div className="flex items-center rounded border border-green-300 bg-white">
+                                <span className="pl-1 text-xs text-gray-400">₹</span>
+                                <input
+                                  type="number"
+                                  value={variantPrices[editKey]}
+                                  onChange={(e) => setVariantPrices(prev => ({ ...prev, [editKey]: e.target.value }))}
+                                  className="w-20 border-0 px-1 py-0.5 text-sm font-medium text-gray-900 focus:outline-none"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                      setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <button
+                                disabled={isSaving}
+                                onClick={async () => {
+                                  const newPrice = parseFloat(variantPrices[editKey]);
+                                  if (isNaN(newPrice) || newPrice < 0) return;
+                                  setSavingVariantId(item.id);
+                                  try {
+                                    const collectionName = item.source || 'sales_items';
+                                    await updateDoc(doc(db, collectionName, item.id), { price: newPrice, updatedAt: Timestamp.now() });
+                                    setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; });
+                                  } catch (error) {
+                                    console.error('Error updating price:', error);
+                                    alert('Failed to update price');
+                                  } finally {
+                                    setSavingVariantId(null);
+                                  }
+                                }}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                              </button>
+                              <button
+                                onClick={() => setVariantPrices(prev => { const next = { ...prev }; delete next[editKey]; return next; })}
+                                className="text-gray-400 hover:text-gray-600"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setVariantPrices(prev => ({ ...prev, [editKey]: item.price.toString() }))}
+                              className="font-medium text-green-600 hover:text-green-800 hover:underline"
+                              title="Click to edit price"
+                            >
+                              ₹{item.price.toLocaleString()}
+                            </button>
+                          );
+                        })()
                       )}
                     </td>
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
