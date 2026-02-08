@@ -140,6 +140,10 @@ export default function StoreCataloguePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // Dimension pricing state
+  const [variantPrices, setVariantPrices] = useState<Record<string, string>>({});
+  const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -341,7 +345,8 @@ export default function StoreCataloguePage() {
       };
 
       if (editingItem) {
-        await updateDoc(doc(db, 'sales_items', editingItem.id), itemData);
+        const collectionName = editingItem.source || 'sales_items';
+        await updateDoc(doc(db, collectionName, editingItem.id), itemData);
       } else {
         await addDoc(collection(db, 'sales_items'), {
           ...itemData,
@@ -1395,7 +1400,7 @@ export default function StoreCataloguePage() {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Item Details</h2>
-              <button onClick={() => setSelectedItem(null)} className="rounded-full p-1 hover:bg-gray-100">
+              <button onClick={() => { setSelectedItem(null); setVariantPrices({}); }} className="rounded-full p-1 hover:bg-gray-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1425,28 +1430,119 @@ export default function StoreCataloguePage() {
                 <p className="text-gray-600">{selectedItem.description}</p>
               </div>
 
-              {/* Available Sizes */}
+              {/* Available Sizes with Editable Pricing */}
               {(() => {
                 const baseName = getBaseName(selectedItem.title);
                 const sizeGroup = groupedItems.find(g => g.baseName === baseName && g.variants.some(v => v.sellerName === selectedItem.sellerName));
                 if (sizeGroup && sizeGroup.variants.length > 1) {
                   return (
                     <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-                      <h4 className="mb-2 text-sm font-semibold text-purple-700">Available Sizes</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {sizeGroup.variants.map((v) => (
-                          <button
-                            key={v.id}
-                            onClick={() => setSelectedItem(v)}
-                            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                              v.id === selectedItem.id
-                                ? 'border-purple-600 bg-purple-600 text-white'
-                                : 'border-purple-300 bg-white text-purple-700 hover:bg-purple-100'
-                            }`}
-                          >
-                            {extractSize(v.title) || 'Default'} — ₹{v.price.toLocaleString()}
-                          </button>
-                        ))}
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-purple-700">Dimension Pricing</h4>
+                        <span className="text-xs text-purple-500">{sizeGroup.variants.length} sizes</span>
+                      </div>
+                      <div className="space-y-2">
+                        {sizeGroup.variants.map((v) => {
+                          const size = extractSize(v.title) || 'Default';
+                          const editKey = v.id;
+                          const isEditing = editKey in variantPrices;
+                          const isSaving = savingVariantId === v.id;
+                          return (
+                            <div
+                              key={v.id}
+                              className={`flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
+                                v.id === selectedItem.id
+                                  ? 'border-purple-400 bg-purple-100'
+                                  : 'border-purple-200 bg-white hover:bg-purple-50'
+                              }`}
+                            >
+                              <button
+                                onClick={() => setSelectedItem(v)}
+                                className="flex items-center gap-2 text-sm font-medium text-purple-700"
+                              >
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-200 text-xs font-bold text-purple-700">
+                                  {size.split(' x ')[0]}
+                                </span>
+                                {size}
+                              </button>
+                              <div className="flex items-center gap-2">
+                                {isEditing ? (
+                                  <>
+                                    <div className="flex items-center rounded-lg border border-purple-300 bg-white">
+                                      <span className="pl-2 text-sm text-gray-400">₹</span>
+                                      <input
+                                        type="number"
+                                        value={variantPrices[editKey]}
+                                        onChange={(e) => setVariantPrices(prev => ({ ...prev, [editKey]: e.target.value }))}
+                                        className="w-24 rounded-lg border-0 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none"
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <button
+                                      disabled={isSaving}
+                                      onClick={async () => {
+                                        const newPrice = parseFloat(variantPrices[editKey]);
+                                        if (isNaN(newPrice) || newPrice < 0) {
+                                          alert('Please enter a valid price');
+                                          return;
+                                        }
+                                        setSavingVariantId(v.id);
+                                        try {
+                                          const collectionName = v.source || 'sales_items';
+                                          await updateDoc(doc(db, collectionName, v.id), {
+                                            price: newPrice,
+                                            updatedAt: Timestamp.now(),
+                                          });
+                                          setVariantPrices(prev => {
+                                            const next = { ...prev };
+                                            delete next[editKey];
+                                            return next;
+                                          });
+                                        } catch (error) {
+                                          console.error('Error updating price:', error);
+                                          alert('Failed to update price');
+                                        } finally {
+                                          setSavingVariantId(null);
+                                        }
+                                      }}
+                                      className="rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      {isSaving ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => setVariantPrices(prev => {
+                                        const next = { ...prev };
+                                        delete next[editKey];
+                                        return next;
+                                      })}
+                                      className="rounded-lg bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-sm font-bold text-green-600">₹{v.price.toLocaleString()}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setVariantPrices(prev => ({ ...prev, [editKey]: v.price.toString() }));
+                                      }}
+                                      className="rounded p-1 text-gray-400 hover:bg-purple-100 hover:text-purple-600"
+                                      title="Edit price"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1527,7 +1623,7 @@ export default function StoreCataloguePage() {
                 Edit Item
               </button>
               <button
-                onClick={() => setSelectedItem(null)}
+                onClick={() => { setSelectedItem(null); setVariantPrices({}); }}
                 className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium hover:bg-gray-200"
               >
                 Close
