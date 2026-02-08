@@ -1325,6 +1325,9 @@ export default function StoreCataloguePage() {
                   const baseTitle = formData.title
                     .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
                     .replace(/\s*(half roll|full roll)\s*/gi, '')
+                    .replace(/[,\s]+$/g, '')
+                    .replace(/^[,\s]+/g, '')
+                    .replace(/,{2,}/g, ',')
                     .trim();
                   if (newSelected.length === 0) {
                     setFormData({ ...formData, title: baseTitle });
