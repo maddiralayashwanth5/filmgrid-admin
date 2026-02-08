@@ -1296,7 +1296,13 @@ export default function StoreCataloguePage() {
                       if (size) sizes.add(size);
                     }
                   }
-                  return Array.from(sizes).sort();
+                  return Array.from(sizes).sort((a, b) => {
+                    const matchA = dimRegex.exec(a);
+                    const matchB = dimRegex.exec(b);
+                    const areaA = matchA ? parseFloat(matchA[1]) * parseFloat(matchA[2]) : 0;
+                    const areaB = matchB ? parseFloat(matchB[1]) * parseFloat(matchB[2]) : 0;
+                    return areaA - areaB;
+                  });
                 })();
                 const allOptions = [...diffusionSizes, 'Half Roll', 'Full Roll'];
                 // Determine currently selected sizes from title
