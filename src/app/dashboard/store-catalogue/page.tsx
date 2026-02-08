@@ -1322,12 +1322,11 @@ export default function StoreCataloguePage() {
                     newSelected = [...selectedSizes, size];
                   }
                   // Rebuild title: base name + all selected sizes
+                  // Strip dimensions, roll labels, then all commas (commas are only from size concatenation)
                   const baseTitle = formData.title
                     .replace(/[\s(]*\d+(?:\.\d+)?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:ft|feet)?[)\s]*/gi, '')
                     .replace(/\s*(half roll|full roll)\s*/gi, '')
-                    .replace(/[,\s]+$/g, '')
-                    .replace(/^[,\s]+/g, '')
-                    .replace(/,{2,}/g, ',')
+                    .replace(/,/g, '')
                     .trim();
                   if (newSelected.length === 0) {
                     setFormData({ ...formData, title: baseTitle });
