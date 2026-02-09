@@ -19,6 +19,7 @@ import {
   IndianRupee,
   Phone,
   Download,
+  Trash2,
 } from 'lucide-react';
 import {
   collection,
@@ -83,6 +84,7 @@ export default function WorkforcePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<WorkerProfile | WorkforceRequest | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   useEffect(() => {
@@ -377,12 +379,45 @@ export default function WorkforcePage() {
         </button>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} item(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected item(s)?`)) return;
+              const collectionName = activeTab === 'workers' ? 'worker_profiles' : 'broadcast_workforce_requests';
+              for (const id of selectedIds) {
+                await deleteDoc(doc(db, collectionName, id));
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         {activeTab === 'workers' ? (
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={paginatedData.length > 0 && paginatedData.every(w => selectedIds.has(w.id))}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) { paginatedData.forEach(w => newSet.add(w.id)); } else { paginatedData.forEach(w => newSet.delete(w.id)); }
+                      setSelectedIds(newSet);
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Worker
                 </th>
@@ -409,7 +444,7 @@ export default function WorkforcePage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No workers found
                   </td>
                 </tr>
@@ -417,9 +452,21 @@ export default function WorkforcePage() {
                 (paginatedData as WorkerProfile[]).map((worker) => (
                   <tr
                     key={worker.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(worker.id) ? 'bg-orange-50' : ''}`}
                     onClick={() => setSelectedItem(worker)}
                   >
+                    <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(worker.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) { newSet.add(worker.id); } else { newSet.delete(worker.id); }
+                          setSelectedIds(newSet);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">

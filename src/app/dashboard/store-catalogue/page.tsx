@@ -118,6 +118,7 @@ export default function StoreCataloguePage() {
   const [saving, setSaving] = useState(false);
   const [sizeFilter, setSizeFilter] = useState<string>('all');
   const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Excel upload state
   const excelInputRef = useRef<HTMLInputElement>(null);
@@ -1050,11 +1051,59 @@ export default function StoreCataloguePage() {
         </div>
       )}
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (() => {
+        // Count total variants across selected groups
+        const selectedGroups = groupedItems.filter(g => selectedIds.has(g.variants[0].id));
+        const totalVariants = selectedGroups.reduce((sum, g) => sum + g.variants.length, 0);
+        return (
+          <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <span className="text-sm font-medium text-red-700">{selectedIds.size} product(s) selected ({totalVariants} items total)</span>
+            <button
+              onClick={async () => {
+                if (!confirm(`Are you sure you want to delete ${selectedIds.size} product(s) (${totalVariants} items)?`)) return;
+                for (const group of selectedGroups) {
+                  for (const v of group.variants) {
+                    await handleDeleteItem(v.id, v.source);
+                  }
+                }
+                setSelectedIds(new Set());
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4" /> Delete Selected
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-gray-600 hover:text-gray-800"
+            >
+              Clear Selection
+            </button>
+          </div>
+        );
+      })()}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-4 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={groupedItems.length > 0 && groupedItems.every(g => selectedIds.has(g.variants[0].id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const allIds = new Set<string>();
+                      groupedItems.forEach(g => allIds.add(g.variants[0].id));
+                      setSelectedIds(allIds);
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                />
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Item
               </th>
@@ -1078,7 +1127,7 @@ export default function StoreCataloguePage() {
           <tbody className="divide-y divide-gray-200">
             {groupedItems.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   No items found
                 </td>
               </tr>
@@ -1089,9 +1138,25 @@ export default function StoreCataloguePage() {
                 return (
                   <tr
                     key={item.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(item.id) ? 'bg-yellow-50' : ''}`}
                     onClick={() => setSelectedItem(item)}
                   >
+                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) {
+                            newSet.add(item.id);
+                          } else {
+                            newSet.delete(item.id);
+                          }
+                          setSelectedIds(newSet);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {item.imageUrl ? (

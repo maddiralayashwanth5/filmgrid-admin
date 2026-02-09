@@ -101,6 +101,7 @@ export default function JobsPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   const [formData, setFormData] = useState({
@@ -477,11 +478,43 @@ export default function JobsPage() {
         </button>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} job(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected job(s)?`)) return;
+              for (const id of selectedIds) {
+                await deleteDoc(doc(db, 'jobs', id));
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-4 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={paginatedData.length > 0 && paginatedData.every(j => selectedIds.has(j.id))}
+                  onChange={(e) => {
+                    const newSet = new Set(selectedIds);
+                    if (e.target.checked) { paginatedData.forEach(j => newSet.add(j.id)); } else { paginatedData.forEach(j => newSet.delete(j.id)); }
+                    setSelectedIds(newSet);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Job
               </th>
@@ -505,7 +538,7 @@ export default function JobsPage() {
           <tbody className="divide-y divide-gray-200">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   No jobs found
                 </td>
               </tr>
@@ -513,9 +546,21 @@ export default function JobsPage() {
               paginatedData.map((job) => (
                 <tr
                   key={job.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(job.id) ? 'bg-blue-50' : ''}`}
                   onClick={() => setSelectedJob(job)}
                 >
+                  <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(job.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedIds);
+                        if (e.target.checked) { newSet.add(job.id); } else { newSet.delete(job.id); }
+                        setSelectedIds(newSet);
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">

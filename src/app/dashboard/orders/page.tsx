@@ -20,6 +20,9 @@ import {
   Phone,
 } from 'lucide-react';
 import { getOpenOrders, cancelOpenOrder } from '@/lib/firestore';
+import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Trash2 } from 'lucide-react';
 import type { OpenOrder, OpenOrderStatus } from '@/lib/types';
 
 const statusColors: Record<OpenOrderStatus, string> = {
@@ -37,6 +40,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<OpenOrder | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   useEffect(() => {
@@ -159,11 +163,43 @@ export default function OrdersPage() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} order(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected order(s)?`)) return;
+              for (const id of selectedIds) {
+                await deleteDoc(doc(db, 'open_orders', id));
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-4 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={paginatedData.length > 0 && paginatedData.every(o => selectedIds.has(o.id))}
+                  onChange={(e) => {
+                    const newSet = new Set(selectedIds);
+                    if (e.target.checked) { paginatedData.forEach(o => newSet.add(o.id)); } else { paginatedData.forEach(o => newSet.delete(o.id)); }
+                    setSelectedIds(newSet);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                />
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Renter
               </th>
@@ -193,7 +229,7 @@ export default function OrdersPage() {
           <tbody className="divide-y divide-gray-200">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                   No orders found
                 </td>
               </tr>
@@ -201,9 +237,21 @@ export default function OrdersPage() {
               paginatedData.map((order) => (
                 <tr
                   key={order.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(order.id) ? 'bg-orange-50' : ''}`}
                   onClick={() => setSelectedOrder(order)}
                 >
+                  <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(order.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedIds);
+                        if (e.target.checked) { newSet.add(order.id); } else { newSet.delete(order.id); }
+                        setSelectedIds(newSet);
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">

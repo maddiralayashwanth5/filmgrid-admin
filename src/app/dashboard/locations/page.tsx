@@ -68,6 +68,7 @@ export default function LocationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingLocation, setEditingLocation] = useState<LeaseLocation | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   const [formData, setFormData] = useState({
@@ -327,10 +328,42 @@ export default function LocationsPage() {
       </div>
 
       {/* Table */}
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} location(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected location(s)?`)) return;
+              for (const id of selectedIds) {
+                await deleteDoc(doc(db, 'lease_locations', id));
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-white shadow-sm">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-4 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={paginatedData.length > 0 && paginatedData.every(l => selectedIds.has(l.id))}
+                  onChange={(e) => {
+                    const newSet = new Set(selectedIds);
+                    if (e.target.checked) { paginatedData.forEach(l => newSet.add(l.id)); } else { paginatedData.forEach(l => newSet.delete(l.id)); }
+                    setSelectedIds(newSet);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Location
               </th>
@@ -357,7 +390,7 @@ export default function LocationsPage() {
           <tbody className="divide-y divide-gray-200">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   No locations found
                 </td>
               </tr>
@@ -365,9 +398,21 @@ export default function LocationsPage() {
               paginatedData.map((location) => (
                 <tr
                   key={location.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(location.id) ? 'bg-teal-50' : ''}`}
                   onClick={() => setSelectedLocation(location)}
                 >
+                  <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(location.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedIds);
+                        if (e.target.checked) { newSet.add(location.id); } else { newSet.delete(location.id); }
+                        setSelectedIds(newSet);
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
