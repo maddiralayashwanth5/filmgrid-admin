@@ -543,7 +543,6 @@ export default function StoreCataloguePage() {
   };
 
   const handleDeleteItem = async (itemId: string, source?: 'sales_items' | 'used_gear') => {
-    if (!confirm('Are you sure you want to delete this item? This cannot be undone.')) return;
     try {
       const collectionName = source || 'sales_items';
       await deleteDoc(doc(db, collectionName, itemId));
