@@ -1491,7 +1491,20 @@ export default function StoreCataloguePage() {
               {formData.category === 'Diffusion Materials' && (() => {
                 const diffusionSizes = (() => {
                   const excludedSizes = new Set(['2 x 3 ft', '8 x 10 ft']);
-                  const sizes = new Set<string>();
+                  // Standard diffusion sizes - always available
+                  const defaultSizes = [
+                    '4 x 4 ft',
+                    '6 x 4 ft',
+                    '6 x 6 ft',
+                    '8 x 8 ft',
+                    '10 x 10 ft',
+                    '12 x 12 ft',
+                    '15 x 15 ft',
+                    '20 x 20 ft',
+                    '40 x 40 ft',
+                  ];
+                  const sizes = new Set<string>(defaultSizes);
+                  // Also add any sizes found in existing items
                   for (const item of items) {
                     if (item.category === 'Diffusion Materials') {
                       const size = extractSize(item.title);
