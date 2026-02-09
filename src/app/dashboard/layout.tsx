@@ -32,7 +32,14 @@ import {
 
 const menuItems = [
   { title: 'Dashboard', href: '/dashboard', icon: Home },
-  { title: 'Users', href: '/dashboard/users', icon: Users },
+  { 
+    title: 'Users', 
+    icon: Users,
+    children: [
+      { title: 'Users & Verification', href: '/dashboard/users' },
+      { title: 'User Projects', href: '/dashboard/projects' },
+    ],
+  },
   { 
     title: 'Equipment', 
     icon: Camera,

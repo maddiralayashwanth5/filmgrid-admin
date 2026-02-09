@@ -29,6 +29,7 @@ import {
   Menu,
   X,
   Sparkles,
+  Film,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -53,6 +54,7 @@ const sidebarCategories: NavCategory[] = [
     icon: Users,
     items: [
       { href: '/dashboard/users', label: 'Users & Verification', icon: Users },
+      { href: '/dashboard/projects', label: 'User Projects', icon: Film },
     ],
   },
   {

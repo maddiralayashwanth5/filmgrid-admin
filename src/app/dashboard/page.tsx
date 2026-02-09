@@ -34,6 +34,7 @@ interface ExtendedStats extends DashboardStats {
   videoPromotions: number;
   workers: number;
   totalJobs: number;
+  projects: number;
 }
 
 // Color type for cards
@@ -205,6 +206,12 @@ export default function DashboardPage() {
         let videoPromotionsCount = 0;
         let workersCount = 0;
         let jobsCount = 0;
+        let projectsCount = 0;
+
+        try {
+          const projectsSnapshot = await getCountFromServer(collection(db, 'projects'));
+          projectsCount = projectsSnapshot.data().count;
+        } catch (e) { console.log('projects not found'); }
 
         try {
           const locationsSnapshot = await getCountFromServer(collection(db, 'lease_locations'));
@@ -251,6 +258,7 @@ export default function DashboardPage() {
           videoPromotions: videoPromotionsCount,
           workers: workersCount,
           totalJobs: jobsCount,
+          projects: projectsCount,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -298,6 +306,7 @@ export default function DashboardPage() {
           count={stats?.totalUsers || 0}
           items={[
             { title: 'All Users', href: '/dashboard/users' },
+            { title: `User Projects (${stats?.projects || 0})`, href: '/dashboard/projects' },
           ]}
         />
 
