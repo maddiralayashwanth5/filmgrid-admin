@@ -102,6 +102,7 @@ export default function EquipmentPage() {
   const [showOwnersModal, setShowOwnersModal] = useState(false);
   const [selectedProductOwners, setSelectedProductOwners] = useState<Equipment[]>([]);
   const [selectedProductName, setSelectedProductName] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Subscribe to both all equipment and pending equipment for counts
   useEffect(() => {
@@ -752,6 +753,26 @@ export default function EquipmentPage() {
         </button>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} equipment item(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected equipment item(s)?`)) return;
+              for (const id of selectedIds) {
+                await deleteEquipment(id);
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
@@ -835,9 +856,22 @@ export default function EquipmentPage() {
                                   return (
                                     <div
                                       key={title}
-                                      className="flex items-center gap-4 rounded-lg border bg-white p-3 hover:bg-gray-50 cursor-pointer"
+                                      className={`flex items-center gap-4 rounded-lg border bg-white p-3 hover:bg-gray-50 cursor-pointer ${items.some(i => selectedIds.has(i.id)) ? 'ring-2 ring-blue-300 bg-blue-50' : ''}`}
                                       onClick={() => handleShowOwners(title, items)}
                                     >
+                                      {/* Checkbox */}
+                                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                          type="checkbox"
+                                          checked={items.every(i => selectedIds.has(i.id))}
+                                          onChange={(e) => {
+                                            const newSet = new Set(selectedIds);
+                                            if (e.target.checked) { items.forEach(i => newSet.add(i.id)); } else { items.forEach(i => newSet.delete(i.id)); }
+                                            setSelectedIds(newSet);
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                      </div>
                                       {/* Image */}
                                       <div className="w-14 shrink-0">
                                         <div className="aspect-square w-14 overflow-hidden rounded-lg border">

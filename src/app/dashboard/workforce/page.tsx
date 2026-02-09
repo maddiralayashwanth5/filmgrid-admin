@@ -589,6 +589,18 @@ export default function WorkforcePage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={paginatedData.length > 0 && paginatedData.every(r => selectedIds.has(r.id))}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) { paginatedData.forEach(r => newSet.add(r.id)); } else { paginatedData.forEach(r => newSet.delete(r.id)); }
+                      setSelectedIds(newSet);
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Request
                 </th>
@@ -615,7 +627,7 @@ export default function WorkforcePage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No requests found
                   </td>
                 </tr>
@@ -623,9 +635,21 @@ export default function WorkforcePage() {
                 (paginatedData as WorkforceRequest[]).map((request) => (
                   <tr
                     key={request.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(request.id) ? 'bg-orange-50' : ''}`}
                     onClick={() => setSelectedItem(request)}
                   >
+                    <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(request.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) { newSet.add(request.id); } else { newSet.delete(request.id); }
+                          setSelectedIds(newSet);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div>
                         <p className="font-medium text-gray-900">{request.roleRequired}</p>

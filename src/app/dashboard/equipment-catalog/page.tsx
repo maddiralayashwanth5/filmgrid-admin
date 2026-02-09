@@ -85,6 +85,7 @@ export default function EquipmentCatalogPage() {
   const [excelData, setExcelData] = useState<FormData[]>([]);
   const [isUploadingExcel, setIsUploadingExcel] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribe = getEquipmentCatalog((items) => {
@@ -471,6 +472,26 @@ export default function EquipmentCatalogPage() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} item(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected item(s)?`)) return;
+              for (const id of selectedIds) {
+                await deleteEquipmentCatalogItem(id);
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {/* Catalog List */}
       {loading ? (
         <div className="flex h-64 items-center justify-center">
@@ -509,8 +530,21 @@ export default function EquipmentCatalogPage() {
                       {items.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center gap-4 rounded-lg border bg-white p-3 hover:bg-gray-50"
+                          className={`flex items-center gap-4 rounded-lg border bg-white p-3 hover:bg-gray-50 ${selectedIds.has(item.id) ? 'ring-2 ring-blue-300 bg-blue-50' : ''}`}
                         >
+                          {/* Checkbox */}
+                          <div className="shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(item.id)}
+                              onChange={(e) => {
+                                const newSet = new Set(selectedIds);
+                                if (e.target.checked) { newSet.add(item.id); } else { newSet.delete(item.id); }
+                                setSelectedIds(newSet);
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </div>
                           {/* Image */}
                           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border">
                             {item.imageUrls?.[0] ? (

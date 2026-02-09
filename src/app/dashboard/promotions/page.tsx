@@ -85,6 +85,7 @@ export default function PromotionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoPromotion | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 15;
 
   const [formData, setFormData] = useState({
@@ -428,12 +429,45 @@ export default function PromotionsPage() {
         </select>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} item(s) selected</span>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected item(s)?`)) return;
+              const collectionName = activeTab === 'videos' ? 'video_promotions' : 'influencer_promotion_requests';
+              for (const id of selectedIds) {
+                await deleteDoc(doc(db, collectionName, id));
+              }
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white shadow-sm">
         {activeTab === 'videos' ? (
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={paginatedData.length > 0 && paginatedData.every(v => selectedIds.has(v.id))}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) { paginatedData.forEach(v => newSet.add(v.id)); } else { paginatedData.forEach(v => newSet.delete(v.id)); }
+                      setSelectedIds(newSet);
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Video
                 </th>
@@ -457,7 +491,7 @@ export default function PromotionsPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     No video promotions found
                   </td>
                 </tr>
@@ -465,9 +499,21 @@ export default function PromotionsPage() {
                 (paginatedData as VideoPromotion[]).map((video) => (
                   <tr
                     key={video.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(video.id) ? 'bg-purple-50' : ''}`}
                     onClick={() => setSelectedItem(video)}
                   >
+                    <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(video.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) { newSet.add(video.id); } else { newSet.delete(video.id); }
+                          setSelectedIds(newSet);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="relative flex h-16 w-24 items-center justify-center rounded-lg bg-gray-100">
@@ -566,6 +612,18 @@ export default function PromotionsPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={paginatedData.length > 0 && paginatedData.every(r => selectedIds.has(r.id))}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) { paginatedData.forEach(r => newSet.add(r.id)); } else { paginatedData.forEach(r => newSet.delete(r.id)); }
+                      setSelectedIds(newSet);
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Campaign
                 </th>
@@ -589,7 +647,7 @@ export default function PromotionsPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     No influencer campaigns found
                   </td>
                 </tr>
@@ -597,9 +655,21 @@ export default function PromotionsPage() {
                 (paginatedData as InfluencerPromotionRequest[]).map((request) => (
                   <tr
                     key={request.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedIds.has(request.id) ? 'bg-purple-50' : ''}`}
                     onClick={() => setSelectedItem(request)}
                   >
+                    <td className="whitespace-nowrap px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(request.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) { newSet.add(request.id); } else { newSet.delete(request.id); }
+                          setSelectedIds(newSet);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div>
                         <p className="font-medium text-gray-900">{request.campaignTitle}</p>
