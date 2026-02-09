@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import NextImage from 'next/image';
 import {
   Users,
   Camera,
@@ -181,6 +182,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<ExtendedStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState('Good Morning');
+  const [splashPhase, setSplashPhase] = useState<'bounce' | 'fadeout' | 'done'>('bounce');
+  const [cardsVisible, setCardsVisible] = useState(false);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -280,137 +283,115 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout);
   }, [loading]);
 
-  if (loading) {
+  // Splash animation sequence
+  useEffect(() => {
+    if (!loading) {
+      // Logo bounces in for 1.2s, then fade out for 0.5s
+      const fadeTimer = setTimeout(() => setSplashPhase('fadeout'), 1200);
+      const doneTimer = setTimeout(() => {
+        setSplashPhase('done');
+        // Stagger cards after splash
+        setTimeout(() => setCardsVisible(true), 100);
+      }, 1700);
+      return () => { clearTimeout(fadeTimer); clearTimeout(doneTimer); };
+    }
+  }, [loading]);
+
+  if (loading || splashPhase !== 'done') {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-      </div>
+      <>
+        <style jsx>{`
+          @keyframes bounceInUp {
+            0% { opacity: 0; transform: translateY(300px) scale(0.5); }
+            40% { opacity: 1; transform: translateY(-30px) scale(1.05); }
+            60% { transform: translateY(10px) scale(0.98); }
+            80% { transform: translateY(-5px) scale(1.01); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes fadeOut {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.9); }
+          }
+          .splash-bounce {
+            animation: bounceInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          }
+          .splash-fadeout {
+            animation: fadeOut 0.5s ease-out forwards;
+          }
+        `}</style>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-indigo-50">
+          <div className={splashPhase === 'fadeout' ? 'splash-fadeout' : 'splash-bounce'}>
+            <div className="flex flex-col items-center gap-4">
+              <NextImage
+                src="/logo.svg"
+                alt="FilmGrid Logo"
+                width={80}
+                height={80}
+                className="rounded-2xl shadow-2xl"
+              />
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-gray-900">FilmGrid</h1>
+                <p className="text-sm text-gray-500 mt-1">Admin Dashboard</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-6">
+      <style jsx>{`
+        @keyframes fadeInUp {
+          0% { opacity: 0; transform: translateY(30px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
       {/* Greeting Header */}
-      <div>
+      <div style={{
+        animation: cardsVisible ? 'fadeInUp 0.6s ease-out forwards' : 'none',
+        opacity: 0,
+      }}>
         <h1 className="text-2xl font-bold text-gray-900">{greeting}!</h1>
         <p className="text-sm text-gray-500">FilmGrid Admin Dashboard</p>
       </div>
 
       {/* Section Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {/* Users Section Card */}
-        <SectionCard
-          title="Users"
-          icon={Users}
-          color="teal"
-          count={stats?.totalUsers || 0}
-          items={[
-            { title: 'All Users', href: '/dashboard/users' },
-            { title: `User Projects (${stats?.projects || 0})`, href: '/dashboard/projects' },
-          ]}
-        />
-
-        {/* Equipment Section Card */}
-        <SectionCard
-          title="Equipment"
-          icon={Camera}
-          color="blue"
-          count={stats?.totalEquipment || 0}
-          items={[
-            { title: 'Equipment Catalog', href: '/dashboard/equipment-catalog' },
-            { title: 'Store Catalogue', href: '/dashboard/store-catalogue' },
-            { title: 'Lender Equipment', href: '/dashboard/equipment' },
-            { title: 'Active Bookings', href: '/dashboard/bookings' },
-            { title: 'Open Orders', href: '/dashboard/orders' },
-            { title: 'Gear Requests', href: '/dashboard/requests' },
-            { title: 'Rental Requests', href: '/dashboard/requests' },
-          ]}
-        />
-
-        {/* Crew Section Card */}
-        <SectionCard
-          title="Crew"
-          icon={Briefcase}
-          color="amber"
-          count={stats?.workers || 0}
-          items={[
-            { title: 'Workers', href: '/dashboard/workforce' },
-            { title: 'Jobs', href: '/dashboard/jobs' },
-          ]}
-        />
-
-        {/* Influencers Section Card */}
-        <SectionCard
-          title="Influencers"
-          icon={Instagram}
-          color="pink"
-          count={stats?.influencers || 0}
-          items={[
-            { title: 'Influencers', href: '/dashboard/influencers' },
-            { title: 'Promotions', href: '/dashboard/promotions' },
-          ]}
-        />
-
-        {/* Banners Section Card */}
-        <SectionCard
-          title="Banners"
-          icon={Image}
-          color="emerald"
-          items={[
-            { title: 'Manage Banners', href: '/dashboard/banners' },
-          ]}
-        />
-
-        {/* Lease Locations Section Card */}
-        <SectionCard
-          title="Lease Locations"
-          icon={MapPin}
-          color="green"
-          count={stats?.locations || 0}
-          items={[
-            { title: 'All Locations', href: '/dashboard/locations' },
-          ]}
-        />
-
-        {/* Competitions Section Card */}
-        <SectionCard
-          title="Competitions"
-          icon={Trophy}
-          color="yellow"
-          items={[
-            { title: 'Manage Competitions', href: '/dashboard/competitions' },
-          ]}
-        />
-
-        {/* Marketing Section Card */}
-        <SectionCard
-          title="Marketing"
-          icon={Mail}
-          color="violet"
-          items={[
-            { title: 'Campaigns', href: '/dashboard/marketing' },
-          ]}
-        />
-
-        {/* Push Notifications Section Card */}
-        <SectionCard
-          title="Notifications"
-          icon={Bell}
-          color="sky"
-          items={[
-            { title: 'Push Notifications', href: '/dashboard/notifications' },
-          ]}
-        />
-
-        {/* Audit Logs Section Card */}
-        <SectionCard
-          title="Audit Logs"
-          icon={History}
-          color="slate"
-          items={[
-            { title: 'View Logs', href: '/dashboard/logs' },
-          ]}
-        />
+        {[
+          <SectionCard key="users" title="Users" icon={Users} color="teal" count={stats?.totalUsers || 0}
+            items={[{ title: 'All Users', href: '/dashboard/users' }, { title: `User Projects (${stats?.projects || 0})`, href: '/dashboard/projects' }]} />,
+          <SectionCard key="equipment" title="Equipment" icon={Camera} color="blue" count={stats?.totalEquipment || 0}
+            items={[{ title: 'Equipment Catalog', href: '/dashboard/equipment-catalog' }, { title: 'Store Catalogue', href: '/dashboard/store-catalogue' }, { title: 'Lender Equipment', href: '/dashboard/equipment' }, { title: 'Active Bookings', href: '/dashboard/bookings' }, { title: 'Open Orders', href: '/dashboard/orders' }, { title: 'Gear Requests', href: '/dashboard/requests' }, { title: 'Rental Requests', href: '/dashboard/requests' }]} />,
+          <SectionCard key="crew" title="Crew" icon={Briefcase} color="amber" count={stats?.workers || 0}
+            items={[{ title: 'Workers', href: '/dashboard/workforce' }, { title: 'Jobs', href: '/dashboard/jobs' }]} />,
+          <SectionCard key="influencers" title="Influencers" icon={Instagram} color="pink" count={stats?.influencers || 0}
+            items={[{ title: 'Influencers', href: '/dashboard/influencers' }, { title: 'Promotions', href: '/dashboard/promotions' }]} />,
+          <SectionCard key="banners" title="Banners" icon={Image} color="emerald"
+            items={[{ title: 'Manage Banners', href: '/dashboard/banners' }]} />,
+          <SectionCard key="locations" title="Lease Locations" icon={MapPin} color="green" count={stats?.locations || 0}
+            items={[{ title: 'All Locations', href: '/dashboard/locations' }]} />,
+          <SectionCard key="competitions" title="Competitions" icon={Trophy} color="yellow"
+            items={[{ title: 'Manage Competitions', href: '/dashboard/competitions' }]} />,
+          <SectionCard key="marketing" title="Marketing" icon={Mail} color="violet"
+            items={[{ title: 'Campaigns', href: '/dashboard/marketing' }]} />,
+          <SectionCard key="notifications" title="Notifications" icon={Bell} color="sky"
+            items={[{ title: 'Push Notifications', href: '/dashboard/notifications' }]} />,
+          <SectionCard key="logs" title="Audit Logs" icon={History} color="slate"
+            items={[{ title: 'View Logs', href: '/dashboard/logs' }]} />,
+        ].map((card, index) => (
+          <div
+            key={index}
+            style={{
+              animation: cardsVisible ? `fadeInUp 0.5s ease-out ${index * 0.08}s forwards` : 'none',
+              opacity: 0,
+            }}
+          >
+            {card}
+          </div>
+        ))}
       </div>
     </div>
   );
