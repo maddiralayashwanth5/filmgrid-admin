@@ -17,7 +17,7 @@ import {
   Settings,
   History,
   Trophy,
-  Mail,
+  Contact,
   Package,
   Store,
   Radio,
@@ -375,8 +375,8 @@ export default function DashboardPage() {
             items={[{ title: 'All Locations', href: '/dashboard/locations' }]} />,
           <SectionCard key="competitions" title="Competitions" icon={Trophy} color="yellow"
             items={[{ title: 'Manage Competitions', href: '/dashboard/competitions' }]} />,
-          <SectionCard key="marketing" title="Marketing" icon={Mail} color="violet"
-            items={[{ title: 'Campaigns', href: '/dashboard/marketing' }]} />,
+          <SectionCard key="referrals" title="Referrals" icon={Contact} color="violet"
+            items={[{ title: 'View Referrals', href: '/dashboard/contacts' }]} />,
           <SectionCard key="notifications" title="Notifications" icon={Bell} color="sky"
             items={[{ title: 'Push Notifications', href: '/dashboard/notifications' }]} />,
           <SectionCard key="logs" title="Audit Logs" icon={History} color="slate"
