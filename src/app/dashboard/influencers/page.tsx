@@ -6,6 +6,7 @@ import {
   Instagram,
   Youtube,
   Twitter,
+  Facebook,
   Star,
   Users,
   Eye,
@@ -19,6 +20,7 @@ import {
   TrendingUp,
   Award,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 import {
   collection,
@@ -35,6 +37,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+interface SocialMediaLink {
+  platform: string;
+  url: string;
+  followers?: string;
+}
+
 interface InfluencerProfile {
   id: string;
   userId: string;
@@ -42,6 +50,7 @@ interface InfluencerProfile {
   bio: string;
   category: string;
   platforms: string[];
+  socialMediaLinks: SocialMediaLink[];
   followersCount: number;
   rating: number;
   totalRatings: number;
@@ -87,24 +96,31 @@ export default function InfluencersPage() {
       where('influencerVerification.status', '==', 'verified')
     );
     const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-      const usersData = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        userId: docSnap.id,
-        name: docSnap.data().displayName || docSnap.data().name || 'Unknown',
-        bio: docSnap.data().bio || '',
-        category: docSnap.data().influencerCategory || 'General',
-        platforms: docSnap.data().platforms || [],
-        followersCount: docSnap.data().followersCount || 0,
-        rating: docSnap.data().rating || 0,
-        totalRatings: docSnap.data().totalRatings || 0,
-        pricePerPost: docSnap.data().pricePerPost,
-        profileImageUrl: docSnap.data().profileImageUrl || docSnap.data().avatarUrl || docSnap.data().photoURL,
-        portfolioUrl: docSnap.data().portfolioUrl,
-        isAvailable: docSnap.data().isAvailable !== false,
-        isVerified: true,
-        isFeatured: false, // Will be set based on featuredIds
-        createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-      })) as InfluencerProfile[];
+      const usersData = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        const socialLinks = (data.socialMediaLinks || []) as SocialMediaLink[];
+        // Extract platforms from socialMediaLinks
+        const platforms = socialLinks.map((link: SocialMediaLink) => link.platform);
+        return {
+          id: docSnap.id,
+          userId: docSnap.id,
+          name: data.displayName || data.name || 'Unknown',
+          bio: data.bio || '',
+          category: data.influencerCategory || 'General',
+          platforms: platforms.length > 0 ? platforms : (data.platforms || []),
+          socialMediaLinks: socialLinks,
+          followersCount: data.followersCount || 0,
+          rating: data.rating || 0,
+          totalRatings: data.totalRatings || 0,
+          pricePerPost: data.pricePerPost || data.promotionPricing,
+          profileImageUrl: data.profileImageUrl || data.avatarUrl || data.photoURL,
+          portfolioUrl: data.portfolioUrl,
+          isAvailable: data.isAvailable !== false,
+          isVerified: true,
+          isFeatured: false,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        };
+      }) as InfluencerProfile[];
       setInfluencers(usersData);
       setLoading(false);
     });
@@ -176,17 +192,31 @@ export default function InfluencersPage() {
     }
   };
 
-  const getPlatformIcon = (platform: string) => {
+  const getPlatformIcon = (platform: string, hasLink: boolean = true) => {
+    const colorClass = hasLink ? '' : 'opacity-30';
     switch (platform.toLowerCase()) {
       case 'instagram':
-        return <Instagram className="h-4 w-4 text-pink-500" />;
+        return <Instagram className={`h-4 w-4 ${hasLink ? 'text-pink-500' : 'text-gray-400'} ${colorClass}`} />;
       case 'youtube':
-        return <Youtube className="h-4 w-4 text-red-500" />;
+        return <Youtube className={`h-4 w-4 ${hasLink ? 'text-red-500' : 'text-gray-400'} ${colorClass}`} />;
+      case 'facebook':
+        return <Facebook className={`h-4 w-4 ${hasLink ? 'text-blue-600' : 'text-gray-400'} ${colorClass}`} />;
       case 'twitter':
-        return <Twitter className="h-4 w-4 text-blue-400" />;
+        return <Twitter className={`h-4 w-4 ${hasLink ? 'text-blue-400' : 'text-gray-400'} ${colorClass}`} />;
       default:
-        return <TrendingUp className="h-4 w-4 text-gray-500" />;
+        return <TrendingUp className={`h-4 w-4 ${hasLink ? 'text-gray-500' : 'text-gray-400'} ${colorClass}`} />;
     }
+  };
+
+  // Helper to get social link URL by platform
+  const getSocialLinkUrl = (links: SocialMediaLink[], platform: string): string | null => {
+    const link = links.find(l => l.platform.toLowerCase() === platform.toLowerCase());
+    return link?.url || null;
+  };
+
+  // Helper to check if influencer has a specific platform link
+  const hasPlatformLink = (links: SocialMediaLink[], platform: string): boolean => {
+    return links.some(l => l.platform.toLowerCase() === platform.toLowerCase() && l.url);
   };
 
   const formatFollowers = (count: number) => {
@@ -405,10 +435,38 @@ export default function InfluencersPage() {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
-                    <div className="flex gap-1">
-                      {influencer.platforms?.map((platform) => (
-                        <span key={platform}>{getPlatformIcon(platform)}</span>
-                      ))}
+                    <div className="flex gap-2">
+                      {/* Always show Instagram, Facebook, YouTube - colored if link exists, dark if not */}
+                      <a
+                        href={getSocialLinkUrl(influencer.socialMediaLinks, 'instagram') || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => !hasPlatformLink(influencer.socialMediaLinks, 'instagram') && e.preventDefault()}
+                        className={`transition-transform ${hasPlatformLink(influencer.socialMediaLinks, 'instagram') ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+                        title={hasPlatformLink(influencer.socialMediaLinks, 'instagram') ? 'Open Instagram' : 'No Instagram link'}
+                      >
+                        {getPlatformIcon('instagram', hasPlatformLink(influencer.socialMediaLinks, 'instagram'))}
+                      </a>
+                      <a
+                        href={getSocialLinkUrl(influencer.socialMediaLinks, 'facebook') || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => !hasPlatformLink(influencer.socialMediaLinks, 'facebook') && e.preventDefault()}
+                        className={`transition-transform ${hasPlatformLink(influencer.socialMediaLinks, 'facebook') ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+                        title={hasPlatformLink(influencer.socialMediaLinks, 'facebook') ? 'Open Facebook' : 'No Facebook link'}
+                      >
+                        {getPlatformIcon('facebook', hasPlatformLink(influencer.socialMediaLinks, 'facebook'))}
+                      </a>
+                      <a
+                        href={getSocialLinkUrl(influencer.socialMediaLinks, 'youtube') || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => !hasPlatformLink(influencer.socialMediaLinks, 'youtube') && e.preventDefault()}
+                        className={`transition-transform ${hasPlatformLink(influencer.socialMediaLinks, 'youtube') ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+                        title={hasPlatformLink(influencer.socialMediaLinks, 'youtube') ? 'Open YouTube' : 'No YouTube link'}
+                      >
+                        {getPlatformIcon('youtube', hasPlatformLink(influencer.socialMediaLinks, 'youtube'))}
+                      </a>
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
@@ -598,16 +656,56 @@ export default function InfluencersPage() {
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Platforms</h4>
-                <div className="mt-1 flex gap-2">
-                  {selectedInfluencer.platforms?.map((platform) => (
-                    <span
-                      key={platform}
-                      className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm"
-                    >
-                      {getPlatformIcon(platform)} {platform}
-                    </span>
-                  ))}
+                <h4 className="text-sm font-medium text-gray-500">Social Media Links</h4>
+                <div className="mt-2 flex gap-3">
+                  {/* Instagram */}
+                  <a
+                    href={getSocialLinkUrl(selectedInfluencer.socialMediaLinks, 'instagram') || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => !hasPlatformLink(selectedInfluencer.socialMediaLinks, 'instagram') && e.preventDefault()}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-all ${
+                      hasPlatformLink(selectedInfluencer.socialMediaLinks, 'instagram')
+                        ? 'bg-pink-50 text-pink-600 hover:bg-pink-100 cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 cursor-default'
+                    }`}
+                  >
+                    <Instagram className={`h-5 w-5 ${hasPlatformLink(selectedInfluencer.socialMediaLinks, 'instagram') ? 'text-pink-500' : 'text-gray-300'}`} />
+                    Instagram
+                    {hasPlatformLink(selectedInfluencer.socialMediaLinks, 'instagram') && <ExternalLink className="h-3 w-3" />}
+                  </a>
+                  {/* Facebook */}
+                  <a
+                    href={getSocialLinkUrl(selectedInfluencer.socialMediaLinks, 'facebook') || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => !hasPlatformLink(selectedInfluencer.socialMediaLinks, 'facebook') && e.preventDefault()}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-all ${
+                      hasPlatformLink(selectedInfluencer.socialMediaLinks, 'facebook')
+                        ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 cursor-default'
+                    }`}
+                  >
+                    <Facebook className={`h-5 w-5 ${hasPlatformLink(selectedInfluencer.socialMediaLinks, 'facebook') ? 'text-blue-600' : 'text-gray-300'}`} />
+                    Facebook
+                    {hasPlatformLink(selectedInfluencer.socialMediaLinks, 'facebook') && <ExternalLink className="h-3 w-3" />}
+                  </a>
+                  {/* YouTube */}
+                  <a
+                    href={getSocialLinkUrl(selectedInfluencer.socialMediaLinks, 'youtube') || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => !hasPlatformLink(selectedInfluencer.socialMediaLinks, 'youtube') && e.preventDefault()}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-all ${
+                      hasPlatformLink(selectedInfluencer.socialMediaLinks, 'youtube')
+                        ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 cursor-default'
+                    }`}
+                  >
+                    <Youtube className={`h-5 w-5 ${hasPlatformLink(selectedInfluencer.socialMediaLinks, 'youtube') ? 'text-red-500' : 'text-gray-300'}`} />
+                    YouTube
+                    {hasPlatformLink(selectedInfluencer.socialMediaLinks, 'youtube') && <ExternalLink className="h-3 w-3" />}
+                  </a>
                 </div>
               </div>
 
