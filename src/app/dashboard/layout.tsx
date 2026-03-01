@@ -23,11 +23,11 @@ import {
   Image as ImageIcon, 
   MapPin, 
   Trophy, 
-  Mail, 
   Bell, 
   History,
   Home,
   ChevronRight,
+  Contact,
 } from 'lucide-react';
 
 const menuItems = [
@@ -71,8 +71,8 @@ const menuItems = [
   { title: 'Banners', href: '/dashboard/banners', icon: ImageIcon },
   { title: 'Locations', href: '/dashboard/locations', icon: MapPin },
   { title: 'Competitions', href: '/dashboard/competitions', icon: Trophy },
-  { title: 'Marketing', href: '/dashboard/marketing', icon: Mail },
-  { title: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+    { title: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { title: 'Referrals', href: '/dashboard/contacts', icon: Contact },
   { title: 'Audit Logs', href: '/dashboard/logs', icon: History },
 ];
 
