@@ -205,7 +205,7 @@ export default function ContactsPage() {
   const handleExportExcel = () => {
     const dataToExport = selectedUserId ? selectedUserContacts : contacts;
     const rows = dataToExport.map(c => ({
-      'Phone': c.phone,
+      'Phone': formatPhoneDisplay(c.phone),
       'Source': c.source,
       'Status': registeredPhones.has(normalizePhone(c.phone)) ? 'Registered' : 'Unregistered',
       'Synced By': c.syncedByName,
@@ -227,6 +227,40 @@ export default function ContactsPage() {
     worksheet['!cols'] = colWidths;
 
     XLSX.writeFile(workbook, `filmgrid_referrals_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleExportUnregistered = () => {
+    const dataToExport = selectedUserId ? selectedUserUnregistered : contacts.filter(c => !registeredPhones.has(normalizePhone(c.phone)));
+    
+    if (dataToExport.length === 0) {
+      alert('No unregistered contacts to export');
+      return;
+    }
+
+    const rows = dataToExport.map(c => ({
+      'Phone': formatPhoneDisplay(c.phone),
+      'Source': c.source,
+      'Synced By': c.syncedByName,
+      'Synced At': c.syncedAt.toLocaleDateString(),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Unregistered Contacts');
+    
+    // Auto-size columns
+    const colWidths = [
+      { wch: 15 }, // Phone
+      { wch: 10 }, // Source
+      { wch: 20 }, // Synced By
+      { wch: 12 }, // Synced At
+    ];
+    worksheet['!cols'] = colWidths;
+
+    const fileName = selectedUserId 
+      ? `filmgrid_unregistered_${selectedUser?.displayName || 'user'}_${new Date().toISOString().split('T')[0]}.xlsx`
+      : `filmgrid_unregistered_all_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   };
 
   const selectedUser = usersWhoSynced.find(u => u.uid === selectedUserId);
@@ -272,6 +306,14 @@ export default function ContactsPage() {
           >
             <Download className="h-4 w-4" />
             Export Excel
+          </button>
+          <button
+            onClick={handleExportUnregistered}
+            disabled={contacts.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Export Unregistered
           </button>
         </div>
       </div>
