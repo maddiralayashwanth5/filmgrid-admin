@@ -54,6 +54,7 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [importing, setImporting] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,14 +131,27 @@ export default function ContactsPage() {
     c.phone && !registeredPhones.has(normalizePhone(c.phone))
   );
 
-  // Apply search filter
-  const filterBySearch = (list: ContactItem[]) => {
-    if (!searchQuery) return list;
-    return list.filter(c => c.phone.includes(searchQuery));
+  // Apply search and status filter
+  const filterContacts = (list: ContactItem[]) => {
+    let filtered = list;
+    
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(c => c.phone.includes(searchQuery));
+    }
+    
+    // Apply status filter
+    if (statusFilter === 'registered') {
+      filtered = filtered.filter(c => registeredPhones.has(normalizePhone(c.phone)));
+    } else if (statusFilter === 'unregistered') {
+      filtered = filtered.filter(c => !registeredPhones.has(normalizePhone(c.phone)));
+    }
+    
+    return filtered;
   };
 
-  const filteredUserContacts = filterBySearch(selectedUserContacts);
-  const filteredUnregistered = filterBySearch(selectedUserUnregistered);
+  const filteredUserContacts = filterContacts(selectedUserContacts);
+  const filteredUnregistered = filterContacts(selectedUserUnregistered);
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -390,7 +404,7 @@ export default function ContactsPage() {
               </p>
             )}
           </div>
-          <div className="p-3 border-b">
+          <div className="p-3 border-b space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -405,6 +419,39 @@ export default function ContactsPage() {
                   <X className="h-4 w-4 text-gray-400" />
                 </button>
               )}
+            </div>
+            {/* Status Filter */}
+            <div className="flex gap-1">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  statusFilter === 'all'
+                    ? 'bg-gray-800 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setStatusFilter('registered')}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  statusFilter === 'registered'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                Registered
+              </button>
+              <button
+                onClick={() => setStatusFilter('unregistered')}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  statusFilter === 'unregistered'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                }`}
+              >
+                Unregistered
+              </button>
             </div>
           </div>
           <div className="max-h-[420px] overflow-y-auto">
