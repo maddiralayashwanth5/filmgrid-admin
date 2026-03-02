@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { collection, onSnapshot, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Search, Upload, Download, Phone, UserCheck, UserX, Users, X, Loader2 } from 'lucide-react';
+import { Search, Upload, Download, Phone, UserCheck, UserX, Users, X, Loader2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ContactItem {
@@ -56,6 +56,7 @@ export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [importing, setImporting] = useState(false);
+  const [removingDuplicates, setRemovingDuplicates] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch synced contacts
@@ -277,6 +278,73 @@ export default function ContactsPage() {
     XLSX.writeFile(workbook, fileName);
   };
 
+  const handleRemoveDuplicates = async () => {
+    if (!confirm('This will remove duplicate phone numbers, keeping only the most recent entry for each number. Continue?')) {
+      return;
+    }
+
+    setRemovingDuplicates(true);
+    try {
+      // Group contacts by normalized phone number
+      const phoneMap = new Map<string, ContactItem[]>();
+      
+      for (const contact of contacts) {
+        const normalized = normalizePhone(contact.phone);
+        if (!normalized) continue;
+        
+        if (!phoneMap.has(normalized)) {
+          phoneMap.set(normalized, []);
+        }
+        phoneMap.get(normalized)!.push(contact);
+      }
+
+      // Find duplicates (entries with more than one contact per phone)
+      const duplicatesToDelete: string[] = [];
+      
+      for (const [, contactList] of phoneMap) {
+        if (contactList.length > 1) {
+          // Sort by syncedAt descending (newest first)
+          contactList.sort((a, b) => b.syncedAt.getTime() - a.syncedAt.getTime());
+          // Keep the first (newest), delete the rest
+          for (let i = 1; i < contactList.length; i++) {
+            duplicatesToDelete.push(contactList[i].id);
+          }
+        }
+      }
+
+      if (duplicatesToDelete.length === 0) {
+        alert('No duplicates found!');
+        setRemovingDuplicates(false);
+        return;
+      }
+
+      // Delete duplicates in batches
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (const docId of duplicatesToDelete) {
+        batch.delete(doc(db, 'synced_contacts', docId));
+        count++;
+
+        if (count % 450 === 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+        }
+      }
+
+      if (count % 450 !== 0) {
+        await batch.commit();
+      }
+
+      alert(`Successfully removed ${duplicatesToDelete.length} duplicate contacts!`);
+    } catch (error) {
+      console.error('Error removing duplicates:', error);
+      alert('Failed to remove duplicates');
+    } finally {
+      setRemovingDuplicates(false);
+    }
+  };
+
   const selectedUser = usersWhoSynced.find(u => u.uid === selectedUserId);
 
   if (loading) {
@@ -328,6 +396,14 @@ export default function ContactsPage() {
           >
             <Download className="h-4 w-4" />
             Export Unregistered
+          </button>
+          <button
+            onClick={handleRemoveDuplicates}
+            disabled={contacts.length === 0 || removingDuplicates}
+            className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            {removingDuplicates ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {removingDuplicates ? 'Removing...' : 'Remove Duplicates'}
           </button>
         </div>
       </div>
