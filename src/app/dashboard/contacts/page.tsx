@@ -29,6 +29,25 @@ const normalizePhone = (phone: string): string => {
   return digits;
 };
 
+// Format phone number for display with consistent +91 prefix
+const formatPhoneDisplay = (phone: string): string => {
+  const digits = phone.replace(/[^\d]/g, '');
+  // If already has 91 prefix (12 digits), format as +91XXXXXXXXXX
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  // If 10 digits (Indian number without country code), add +91
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  // If starts with 0 (11 digits), remove 0 and add +91
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `+91${digits.slice(1)}`;
+  }
+  // For any other format, just return with + if not present
+  return phone.startsWith('+') ? phone : `+${digits}`;
+};
+
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<ContactItem[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
@@ -369,7 +388,7 @@ export default function ContactsPage() {
                         <Phone className={`h-3.5 w-3.5 ${isRegistered ? 'text-green-600' : 'text-orange-600'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{contact.phone}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{formatPhoneDisplay(contact.phone)}</p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         isRegistered ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
@@ -417,7 +436,7 @@ export default function ContactsPage() {
                       <Phone className="h-4 w-4 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{contact.phone}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{formatPhoneDisplay(contact.phone)}</p>
                     </div>
                   </div>
                 ))}
