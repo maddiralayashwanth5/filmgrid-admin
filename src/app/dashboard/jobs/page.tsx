@@ -105,7 +105,6 @@ export default function JobsPage() {
   const pageSize = 15;
 
   const [formData, setFormData] = useState({
-    title: '',
     description: '',
     category: 'Camera Operator',
     jobType: 'freelance',
@@ -178,9 +177,8 @@ export default function JobsPage() {
     if (job) {
       setEditingJob(job);
       setFormData({
-        title: job.title,
         description: job.description,
-        category: job.category,
+        category: job.category || job.title, // Use category or fallback to title for existing jobs
         jobType: job.jobType,
         location: job.location,
         city: job.city,
@@ -202,7 +200,6 @@ export default function JobsPage() {
     } else {
       setEditingJob(null);
       setFormData({
-        title: '',
         description: '',
         category: 'Camera Operator',
         jobType: 'freelance',
@@ -260,7 +257,7 @@ export default function JobsPage() {
   };
 
   const handleSaveJob = async () => {
-    if (!formData.title || !formData.category || !formData.city) {
+    if (!formData.category || !formData.city) {
       alert('Please fill in all required fields');
       return;
     }
@@ -268,7 +265,7 @@ export default function JobsPage() {
     setSaving(true);
     try {
       const jobData = {
-        title: formData.title,
+        title: formData.category, // Use category as title
         description: formData.description,
         category: formData.category,
         type: formData.jobType, // Mobile app expects 'type' not 'jobType'
@@ -322,7 +319,7 @@ export default function JobsPage() {
             const sendLiveJobNotification = httpsCallable(functions, 'sendLiveJobNotification');
             await sendLiveJobNotification({
               jobId: docRef.id,
-              title: formData.title,
+              title: formData.category, // Use category as title
               category: formData.category,
               city: formData.city,
             });
@@ -721,28 +718,6 @@ export default function JobsPage() {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Job Title *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="e.g., Senior DOP"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={4}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="Job description..."
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Category *</label>
@@ -772,6 +747,17 @@ export default function JobsPage() {
                     <option value="full-time">Full-time</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
+                  placeholder="Job description..."
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
