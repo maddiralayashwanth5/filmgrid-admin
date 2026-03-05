@@ -23,6 +23,7 @@ import {
   Radio,
   ArrowRight,
   LayoutDashboard,
+  Gift,
 } from 'lucide-react';
 import { getDashboardStats } from '@/lib/firestore';
 import { collection, getCountFromServer } from 'firebase/firestore';
@@ -375,8 +376,8 @@ export default function DashboardPage() {
             items={[{ title: 'All Locations', href: '/dashboard/locations' }]} />,
           <SectionCard key="competitions" title="Competitions" icon={Trophy} color="yellow"
             items={[{ title: 'Manage Competitions', href: '/dashboard/competitions' }]} />,
-          <SectionCard key="referrals" title="Referrals" icon={Contact} color="violet"
-            items={[{ title: 'View Referrals', href: '/dashboard/contacts' }]} />,
+          <SectionCard key="referrals" title="Referrals & Credits" icon={Gift} color="violet"
+            items={[{ title: 'Referrals & Credits', href: '/dashboard/referrals' }, { title: 'Synced Contacts', href: '/dashboard/contacts' }]} />,
           <SectionCard key="notifications" title="Notifications" icon={Bell} color="sky"
             items={[{ title: 'Push Notifications', href: '/dashboard/notifications' }]} />,
           <SectionCard key="logs" title="Audit Logs" icon={History} color="slate"

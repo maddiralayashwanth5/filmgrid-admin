@@ -28,6 +28,7 @@ import {
   Home,
   ChevronRight,
   Contact,
+  Gift,
 } from 'lucide-react';
 
 const menuItems = [
@@ -72,7 +73,8 @@ const menuItems = [
   { title: 'Locations', href: '/dashboard/locations', icon: MapPin },
   { title: 'Competitions', href: '/dashboard/competitions', icon: Trophy },
     { title: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-  { title: 'Referrals', href: '/dashboard/contacts', icon: Contact },
+  { title: 'Contacts', href: '/dashboard/contacts', icon: Contact },
+  { title: 'Referrals & Credits', href: '/dashboard/referrals', icon: Gift },
   { title: 'Audit Logs', href: '/dashboard/logs', icon: History },
 ];
 

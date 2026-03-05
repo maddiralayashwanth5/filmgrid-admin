@@ -178,7 +178,11 @@ export default function ContactsPage() {
         return;
       }
 
+      // Get existing phone numbers (normalized) to avoid duplicates
+      const existingPhones = new Set(contacts.map(c => normalizePhone(c.phone)));
+      
       let count = 0;
+      let skipped = 0;
       let batch = writeBatch(db);
 
       for (let i = 1; i < lines.length; i++) {
@@ -186,6 +190,16 @@ export default function ContactsPage() {
         const phone = cols[phoneIdx] || '';
 
         if (!phone) continue;
+
+        // Skip if phone already exists
+        const normalizedPhone = normalizePhone(phone);
+        if (existingPhones.has(normalizedPhone)) {
+          skipped++;
+          continue;
+        }
+        
+        // Add to existing set to avoid duplicates within same import
+        existingPhones.add(normalizedPhone);
 
         const docRef = doc(collection(db, 'synced_contacts'));
         batch.set(docRef, {
@@ -203,11 +217,11 @@ export default function ContactsPage() {
         }
       }
 
-      if (count % 450 !== 0) {
+      if (count > 0 && count % 450 !== 0) {
         await batch.commit();
       }
 
-      alert(`Successfully imported ${count} phone number(s)`);
+      alert(`Imported ${count} new contact(s). Skipped ${skipped} duplicate(s).`);
     } catch (error) {
       console.error('Error importing CSV:', error);
       alert('Failed to import CSV');

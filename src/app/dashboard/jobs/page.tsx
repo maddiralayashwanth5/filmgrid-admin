@@ -122,6 +122,9 @@ export default function JobsPage() {
     isLiveJob: true,
     sendNotification: true,
     imageUrl: '',
+    contactName: '',
+    contactPhone: '',
+    contactEmail: '',
   });
 
   useEffect(() => {
@@ -196,6 +199,9 @@ export default function JobsPage() {
         isLiveJob: job.isLiveJob ?? true,
         sendNotification: false,
         imageUrl: job.imageUrl || '',
+        contactName: (job as any).contactName || '',
+        contactPhone: (job as any).contactPhone || '',
+        contactEmail: (job as any).contactEmail || '',
       });
     } else {
       setEditingJob(null);
@@ -217,6 +223,9 @@ export default function JobsPage() {
         isLiveJob: true,
         sendNotification: true,
         imageUrl: '',
+        contactName: '',
+        contactPhone: '',
+        contactEmail: '',
       });
     }
     setShowForm(true);
@@ -286,9 +295,9 @@ export default function JobsPage() {
         posterName: formData.posterName,
         posterId: 'admin',
         postedBy: 'admin', // Mobile app expects 'postedBy'
-        contactName: formData.posterName,
-        contactPhone: '',
-        contactEmail: '',
+        contactName: formData.contactName || formData.posterName,
+        contactPhone: formData.contactPhone,
+        contactEmail: formData.contactEmail,
         isVerified: true,
         isActive: true,
         status: 'active', // Mobile app filters by status field
@@ -852,7 +861,25 @@ export default function JobsPage() {
                 </label>
                 <textarea
                   value={formData.requirements}
-                  onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    // Detect mobile numbers (Indian format: 10 digits, optionally with +91 or 0 prefix)
+                    const phoneRegex = /(?:\+91[\s-]?)?(?:0)?[6-9]\d{9}/g;
+                    const phones = text.match(phoneRegex);
+                    
+                    if (phones && phones.length > 0 && !formData.contactPhone) {
+                      // Extract the first phone number found and clean it
+                      let phone = phones[0].replace(/[\s-]/g, '');
+                      if (!phone.startsWith('+91')) {
+                        phone = phone.startsWith('0') ? '+91' + phone.slice(1) : '+91' + phone;
+                      }
+                      // Remove the phone from requirements text
+                      const cleanedText = text.replace(phoneRegex, '').replace(/\n{2,}/g, '\n').trim();
+                      setFormData({ ...formData, requirements: cleanedText, contactPhone: phone });
+                    } else {
+                      setFormData({ ...formData, requirements: text });
+                    }
+                  }}
                   rows={3}
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
                   placeholder="Must have own equipment&#10;Available for night shoots&#10;Valid driving license"
@@ -880,6 +907,43 @@ export default function JobsPage() {
                   onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
                   className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
                 />
+              </div>
+
+              {/* Contact Details */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">Contact Details</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Contact Name</label>
+                    <input
+                      type="text"
+                      value={formData.contactName}
+                      onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
+                      placeholder="e.g., John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Contact Phone *</label>
+                    <input
+                      type="tel"
+                      value={formData.contactPhone}
+                      onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
+                      placeholder="e.g., +91 9876543210"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Contact Email</label>
+                    <input
+                      type="email"
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:outline-none"
+                      placeholder="e.g., contact@example.com"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Job Image/Banner */}
