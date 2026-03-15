@@ -156,7 +156,9 @@ export default function CompetitionsPage() {
     maxVideoDurationSec: '60',
     maxFileSizeMB: '100',
     status: 'draft' as CompetitionStatus,
-    prizes: '',
+    firstPrize: '',
+    secondPrize: '',
+    thirdPrize: '',
     categories: '',
   });
 
@@ -236,7 +238,9 @@ export default function CompetitionsPage() {
         maxVideoDurationSec: competition.maxVideoDurationSec?.toString() || '60',
         maxFileSizeMB: competition.maxFileSizeMB?.toString() || '100',
         status: competition.status,
-        prizes: competition.prizes ? JSON.stringify(competition.prizes, null, 2) : '',
+        firstPrize: competition.prizes?.first?.toString() || '',
+        secondPrize: competition.prizes?.second?.toString() || '',
+        thirdPrize: competition.prizes?.third?.toString() || '',
         categories: competition.categories?.join(', ') || '',
       });
     } else {
@@ -264,7 +268,9 @@ export default function CompetitionsPage() {
         maxVideoDurationSec: '60',
         maxFileSizeMB: '100',
         status: 'draft',
-        prizes: '',
+        firstPrize: '',
+        secondPrize: '',
+        thirdPrize: '',
         categories: '',
       });
     }
@@ -315,16 +321,12 @@ export default function CompetitionsPage() {
 
     setSaving(true);
     try {
-      let prizes = null;
-      if (formData.prizes) {
-        try {
-          prizes = JSON.parse(formData.prizes);
-        } catch {
-          alert('Invalid prizes JSON format');
-          setSaving(false);
-          return;
-        }
-      }
+      // Build prizes object from separate fields
+      const prizes = {
+        first: parseFloat(formData.firstPrize) || 0,
+        second: parseFloat(formData.secondPrize) || 0,
+        third: parseFloat(formData.thirdPrize) || 0,
+      };
 
       // Use registration dates as primary, fall back to legacy fields
       const regStart = formData.registrationStart || formData.startTime;
@@ -1155,15 +1157,43 @@ export default function CompetitionsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Prizes (JSON format)</label>
-                <textarea
-                  value={formData.prizes}
-                  onChange={(e) => setFormData({ ...formData, prizes: e.target.value })}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm focus:border-yellow-500 focus:outline-none"
-                  placeholder='{"first": 10000, "second": 5000, "third": 2500}'
-                />
+              {/* Prize Distribution */}
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <h3 className="mb-4 flex items-center gap-2 font-medium text-yellow-700">
+                  <Award className="h-4 w-4" /> Prize Distribution (₹)
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600">🥇 1st Prize</label>
+                    <input
+                      type="number"
+                      value={formData.firstPrize}
+                      onChange={(e) => setFormData({ ...formData, firstPrize: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      placeholder="10000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600">🥈 2nd Prize</label>
+                    <input
+                      type="number"
+                      value={formData.secondPrize}
+                      onChange={(e) => setFormData({ ...formData, secondPrize: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      placeholder="5000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600">🥉 3rd Prize</label>
+                    <input
+                      type="number"
+                      value={formData.thirdPrize}
+                      onChange={(e) => setFormData({ ...formData, thirdPrize: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      placeholder="2500"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1253,9 +1283,23 @@ export default function CompetitionsPage() {
               {selectedCompetition.prizes && (
                 <div className="rounded-lg bg-yellow-50 p-4">
                   <h4 className="text-sm font-medium text-yellow-600">Prizes</h4>
-                  <pre className="mt-2 text-sm text-yellow-700">
-                    {JSON.stringify(selectedCompetition.prizes, null, 2)}
-                  </pre>
+                  <div className="mt-2 grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <span className="text-2xl">🥇</span>
+                      <p className="text-lg font-bold text-yellow-700">₹{selectedCompetition.prizes.first?.toLocaleString() || 0}</p>
+                      <p className="text-xs text-yellow-600">1st Prize</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-2xl">🥈</span>
+                      <p className="text-lg font-bold text-yellow-700">₹{selectedCompetition.prizes.second?.toLocaleString() || 0}</p>
+                      <p className="text-xs text-yellow-600">2nd Prize</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-2xl">🥉</span>
+                      <p className="text-lg font-bold text-yellow-700">₹{selectedCompetition.prizes.third?.toLocaleString() || 0}</p>
+                      <p className="text-xs text-yellow-600">3rd Prize</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
