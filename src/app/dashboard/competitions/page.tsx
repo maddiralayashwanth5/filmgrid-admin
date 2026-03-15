@@ -54,13 +54,27 @@ interface Competition {
   description: string;
   rules: string;
   entryFee: number;
+  prizePool: number;
   bannerUrl?: string;
   razorpayPlanId?: string;
   razorpayProductId?: string;
+  // Phase-based timing
+  registrationStart: Date;
+  registrationEnd: Date;
+  submissionStart: Date;
+  submissionEnd: Date;
+  judgingStart: Date;
+  judgingEnd: Date;
+  resultsDate: Date;
+  // Legacy fields for backward compatibility
   startTime: Date;
   endTime: Date;
+  maxParticipants: number;
   maxSubmissions: number;
+  maxVideoDurationSec: number;
+  maxFileSizeMB: number;
   status: CompetitionStatus;
+  phase: string;
   createdBy: string;
   createdAt: Date;
   prizes?: Record<string, any>;
@@ -122,12 +136,25 @@ export default function CompetitionsPage() {
     description: '',
     rules: '',
     entryFee: '0',
+    prizePool: '10000',
     bannerUrl: '',
     razorpayPlanId: '',
     razorpayProductId: '',
+    // Phase-based timing
+    registrationStart: '',
+    registrationEnd: '',
+    submissionStart: '',
+    submissionEnd: '',
+    judgingStart: '',
+    judgingEnd: '',
+    resultsDate: '',
+    // Legacy fields
     startTime: '',
     endTime: '',
+    maxParticipants: '100',
     maxSubmissions: '1',
+    maxVideoDurationSec: '60',
+    maxFileSizeMB: '100',
     status: 'draft' as CompetitionStatus,
     prizes: '',
     categories: '',
@@ -136,13 +163,30 @@ export default function CompetitionsPage() {
   useEffect(() => {
     const competitionsQuery = query(collection(db, 'competitions'), orderBy('createdAt', 'desc'));
     const unsubCompetitions = onSnapshot(competitionsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        startTime: doc.data().startTime?.toDate() || new Date(),
-        endTime: doc.data().endTime?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-      })) as Competition[];
+      const data = snapshot.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          // Phase-based timing
+          registrationStart: d.registrationStart?.toDate() || d.startTime?.toDate() || new Date(),
+          registrationEnd: d.registrationEnd?.toDate() || d.startTime?.toDate() || new Date(),
+          submissionStart: d.submissionStart?.toDate() || d.startTime?.toDate() || new Date(),
+          submissionEnd: d.submissionEnd?.toDate() || d.endTime?.toDate() || new Date(),
+          judgingStart: d.judgingStart?.toDate() || d.endTime?.toDate() || new Date(),
+          judgingEnd: d.judgingEnd?.toDate() || d.endTime?.toDate() || new Date(),
+          resultsDate: d.resultsDate?.toDate() || d.endTime?.toDate() || new Date(),
+          // Legacy fields
+          startTime: d.startTime?.toDate() || d.registrationStart?.toDate() || new Date(),
+          endTime: d.endTime?.toDate() || d.submissionEnd?.toDate() || new Date(),
+          createdAt: d.createdAt?.toDate() || new Date(),
+          prizePool: d.prizePool || 0,
+          maxParticipants: d.maxParticipants || 100,
+          maxVideoDurationSec: d.maxVideoDurationSec || 60,
+          maxFileSizeMB: d.maxFileSizeMB || 100,
+          phase: d.phase || 'registration',
+        };
+      }) as Competition[];
       setCompetitions(data);
       setLoading(false);
     });
@@ -172,12 +216,25 @@ export default function CompetitionsPage() {
         description: competition.description,
         rules: competition.rules,
         entryFee: competition.entryFee.toString(),
+        prizePool: competition.prizePool?.toString() || '10000',
         bannerUrl: competition.bannerUrl || '',
         razorpayPlanId: competition.razorpayPlanId || '',
         razorpayProductId: competition.razorpayProductId || '',
+        // Phase-based timing
+        registrationStart: format(competition.registrationStart, "yyyy-MM-dd'T'HH:mm"),
+        registrationEnd: format(competition.registrationEnd, "yyyy-MM-dd'T'HH:mm"),
+        submissionStart: format(competition.submissionStart, "yyyy-MM-dd'T'HH:mm"),
+        submissionEnd: format(competition.submissionEnd, "yyyy-MM-dd'T'HH:mm"),
+        judgingStart: format(competition.judgingStart, "yyyy-MM-dd'T'HH:mm"),
+        judgingEnd: format(competition.judgingEnd, "yyyy-MM-dd'T'HH:mm"),
+        resultsDate: format(competition.resultsDate, "yyyy-MM-dd'T'HH:mm"),
+        // Legacy fields
         startTime: format(competition.startTime, "yyyy-MM-dd'T'HH:mm"),
         endTime: format(competition.endTime, "yyyy-MM-dd'T'HH:mm"),
-        maxSubmissions: competition.maxSubmissions.toString(),
+        maxParticipants: competition.maxParticipants?.toString() || '100',
+        maxSubmissions: competition.maxSubmissions?.toString() || '1',
+        maxVideoDurationSec: competition.maxVideoDurationSec?.toString() || '60',
+        maxFileSizeMB: competition.maxFileSizeMB?.toString() || '100',
         status: competition.status,
         prizes: competition.prizes ? JSON.stringify(competition.prizes, null, 2) : '',
         categories: competition.categories?.join(', ') || '',
@@ -189,12 +246,23 @@ export default function CompetitionsPage() {
         description: '',
         rules: '',
         entryFee: '0',
+        prizePool: '10000',
         bannerUrl: '',
         razorpayPlanId: '',
         razorpayProductId: '',
+        registrationStart: '',
+        registrationEnd: '',
+        submissionStart: '',
+        submissionEnd: '',
+        judgingStart: '',
+        judgingEnd: '',
+        resultsDate: '',
         startTime: '',
         endTime: '',
+        maxParticipants: '100',
         maxSubmissions: '1',
+        maxVideoDurationSec: '60',
+        maxFileSizeMB: '100',
         status: 'draft',
         prizes: '',
         categories: '',
@@ -240,8 +308,8 @@ export default function CompetitionsPage() {
   };
 
   const handleSaveCompetition = async () => {
-    if (!formData.title || !formData.startTime || !formData.endTime) {
-      alert('Please fill in all required fields');
+    if (!formData.title || !formData.registrationStart || !formData.registrationEnd || !formData.submissionEnd) {
+      alert('Please fill in all required fields (Title, Registration Start/End, Submission End)');
       return;
     }
 
@@ -258,18 +326,41 @@ export default function CompetitionsPage() {
         }
       }
 
+      // Use registration dates as primary, fall back to legacy fields
+      const regStart = formData.registrationStart || formData.startTime;
+      const regEnd = formData.registrationEnd || formData.startTime;
+      const subStart = formData.submissionStart || formData.registrationEnd || formData.startTime;
+      const subEnd = formData.submissionEnd || formData.endTime;
+      const judgStart = formData.judgingStart || formData.submissionEnd || formData.endTime;
+      const judgEnd = formData.judgingEnd || formData.submissionEnd || formData.endTime;
+      const results = formData.resultsDate || formData.judgingEnd || formData.endTime;
+
       const competitionData = {
         title: formData.title,
         description: formData.description,
         rules: formData.rules,
         entryFee: parseFloat(formData.entryFee) || 0,
+        prizePool: parseFloat(formData.prizePool) || 0,
         bannerUrl: formData.bannerUrl || null,
         razorpayPlanId: formData.razorpayPlanId || null,
         razorpayProductId: formData.razorpayProductId || null,
-        startTime: Timestamp.fromDate(new Date(formData.startTime)),
-        endTime: Timestamp.fromDate(new Date(formData.endTime)),
+        // Phase-based timing
+        registrationStart: Timestamp.fromDate(new Date(regStart)),
+        registrationEnd: Timestamp.fromDate(new Date(regEnd)),
+        submissionStart: Timestamp.fromDate(new Date(subStart)),
+        submissionEnd: Timestamp.fromDate(new Date(subEnd)),
+        judgingStart: Timestamp.fromDate(new Date(judgStart)),
+        judgingEnd: Timestamp.fromDate(new Date(judgEnd)),
+        resultsDate: Timestamp.fromDate(new Date(results)),
+        // Legacy fields for backward compatibility
+        startTime: Timestamp.fromDate(new Date(regStart)),
+        endTime: Timestamp.fromDate(new Date(subEnd)),
+        maxParticipants: parseInt(formData.maxParticipants) || 100,
         maxSubmissions: parseInt(formData.maxSubmissions) || 1,
+        maxVideoDurationSec: parseInt(formData.maxVideoDurationSec) || 60,
+        maxFileSizeMB: parseInt(formData.maxFileSizeMB) || 100,
         status: formData.status,
+        phase: 'registration',
         prizes,
         categories: formData.categories.split(',').map(c => c.trim()).filter(Boolean),
         updatedAt: Timestamp.now(),
@@ -856,7 +947,7 @@ export default function CompetitionsPage() {
                 <p className="mt-1 text-xs text-gray-500">Recommended size: 1200x400px. Max 5MB. This will be displayed as the competition header.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Entry Fee (₹)</label>
                   <select
@@ -869,6 +960,16 @@ export default function CompetitionsPage() {
                     <option value="75">₹75 - Standard</option>
                     <option value="99">₹99 - Premium</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Prize Pool (₹)</label>
+                  <input
+                    type="number"
+                    value={formData.prizePool}
+                    onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
+                    placeholder="10000"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Max Submissions per User</label>
@@ -894,24 +995,137 @@ export default function CompetitionsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Start Time *</label>
-                  <input
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
-                  />
+              {/* Schedule Section */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h3 className="mb-4 flex items-center gap-2 font-medium text-blue-700">
+                  <Calendar className="h-4 w-4" /> Competition Schedule
+                </h3>
+                
+                {/* Registration Phase */}
+                <div className="mb-4">
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">📝 Registration Phase</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Registration Start *</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.registrationStart}
+                        onChange={(e) => setFormData({ ...formData, registrationStart: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Registration End *</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.registrationEnd}
+                        onChange={(e) => setFormData({ ...formData, registrationEnd: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Submission Phase */}
+                <div className="mb-4">
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">🎬 Submission Phase</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Submission Start</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.submissionStart}
+                        onChange={(e) => setFormData({ ...formData, submissionStart: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Submission End *</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.submissionEnd}
+                        onChange={(e) => setFormData({ ...formData, submissionEnd: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Judging Phase */}
+                <div className="mb-4">
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">⚖️ Judging Phase</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Judging Start</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.judgingStart}
+                        onChange={(e) => setFormData({ ...formData, judgingStart: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Judging End</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.judgingEnd}
+                        onChange={(e) => setFormData({ ...formData, judgingEnd: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Results */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">End Time *</label>
-                  <input
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 focus:border-yellow-500 focus:outline-none"
-                  />
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">🏆 Results</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Results Announcement Date</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.resultsDate}
+                        onChange={(e) => setFormData({ ...formData, resultsDate: e.target.value })}
+                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video Requirements */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <h3 className="mb-4 flex items-center gap-2 font-medium text-gray-700">
+                  <Video className="h-4 w-4" /> Video Requirements
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600">Max Participants</label>
+                    <input
+                      type="number"
+                      value={formData.maxParticipants}
+                      onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600">Max Duration (seconds)</label>
+                    <input
+                      type="number"
+                      value={formData.maxVideoDurationSec}
+                      onChange={(e) => setFormData({ ...formData, maxVideoDurationSec: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600">Max File Size (MB)</label>
+                    <input
+                      type="number"
+                      value={formData.maxFileSizeMB}
+                      onChange={(e) => setFormData({ ...formData, maxFileSizeMB: e.target.value })}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
