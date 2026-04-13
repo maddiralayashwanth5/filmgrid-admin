@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Contact,
   Gift,
+  Database,
 } from 'lucide-react';
 
 const menuItems = [
@@ -85,6 +86,7 @@ const menuItems = [
   { title: 'Contacts', href: '/dashboard/contacts', icon: Contact },
   { title: 'Referrals & Credits', href: '/dashboard/referrals', icon: Gift },
   { title: 'Audit Logs', href: '/dashboard/logs', icon: History },
+  { title: 'Data Management', href: '/dashboard/data-management', icon: Database },
 ];
 
 const getAdminDisplayName = (email: string | null | undefined): string => {
