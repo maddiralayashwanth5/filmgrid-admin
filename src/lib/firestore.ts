@@ -1247,3 +1247,65 @@ export const toggleEquipmentCatalogStatus = async (id: string, isActive: boolean
     updatedAt: Timestamp.now(),
   });
 };
+
+// ==================== POPUP BANNER ====================
+
+export interface PopupBanner {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Get popup banner config
+export const getPopupBanner = async (): Promise<PopupBanner | null> => {
+  const q = query(
+    collection(db, 'app_config'),
+    where('type', '==', 'popup_banner'),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return {
+    id: doc.id,
+    ...doc.data(),
+    createdAt: toDate(doc.data().createdAt),
+    updatedAt: toDate(doc.data().updatedAt),
+  } as PopupBanner;
+};
+
+// Save popup banner config
+export const savePopupBanner = async (data: Omit<PopupBanner, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const existing = await getPopupBanner();
+  if (existing) {
+    await updateDoc(doc(db, 'app_config', existing.id), {
+      ...data,
+      type: 'popup_banner',
+      updatedAt: Timestamp.now(),
+    });
+    return existing.id;
+  } else {
+    const docRef = await addDoc(collection(db, 'app_config'), {
+      ...data,
+      type: 'popup_banner',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+    return docRef.id;
+  }
+};
+
+// Toggle popup banner status
+export const togglePopupBanner = async (isActive: boolean) => {
+  const existing = await getPopupBanner();
+  if (existing) {
+    await updateDoc(doc(db, 'app_config', existing.id), {
+      isActive,
+      updatedAt: Timestamp.now(),
+    });
+  }
+};

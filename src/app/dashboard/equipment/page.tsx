@@ -769,7 +769,7 @@ export default function EquipmentPage() {
           >
             <Trash2 className="h-4 w-4" /> Delete Selected
           </button>
-          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-600 hover:text-gray-800">Clear Selection</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-300 hover:text-white">Clear Selection</button>
         </div>
       )}
 

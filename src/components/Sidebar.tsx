@@ -96,6 +96,7 @@ const bannerSubItems = [
   { href: '/dashboard/banners', label: 'Hero Banners' },
   { href: '/dashboard/banners/equipment', label: 'Equipment Banners' },
   { href: '/dashboard/banners/crew', label: 'Crew Banners' },
+  { href: '/dashboard/popup-banner', label: 'Popup Banner' },
 ];
 
 const otherNavItems = [
@@ -156,7 +157,7 @@ export default function Sidebar() {
     );
   };
 
-  const isBannerActive = pathname.includes('/dashboard/banners');
+  const isBannerActive = pathname.includes('/dashboard/banners') || pathname.includes('/dashboard/popup-banner');
 
   return (
     <>

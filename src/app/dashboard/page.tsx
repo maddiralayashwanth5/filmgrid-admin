@@ -115,24 +115,24 @@ function SectionCard({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const colorStyles: Record<CardColor, { bg: string; text: string; border: string }> = {
-    teal: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
-    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
-    amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
-    rose: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' },
-    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
-    purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
-    orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
-    cyan: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-200' },
-    pink: { bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-200' },
-    lime: { bg: 'bg-lime-50', text: 'text-lime-600', border: 'border-lime-200' },
-    violet: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-200' },
-    fuchsia: { bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', border: 'border-fuchsia-200' },
-    sky: { bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-sky-200' },
-    red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-    green: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
-    yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' },
-    slate: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    teal: { bg: 'bg-teal-900/30', text: 'text-teal-400', border: 'border-teal-700/50' },
+    indigo: { bg: 'bg-indigo-900/30', text: 'text-indigo-400', border: 'border-indigo-700/50' },
+    amber: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-700/50' },
+    rose: { bg: 'bg-rose-900/30', text: 'text-rose-400', border: 'border-rose-700/50' },
+    emerald: { bg: 'bg-emerald-900/30', text: 'text-emerald-400', border: 'border-emerald-700/50' },
+    blue: { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-700/50' },
+    purple: { bg: 'bg-purple-900/30', text: 'text-purple-400', border: 'border-purple-700/50' },
+    orange: { bg: 'bg-orange-900/30', text: 'text-orange-400', border: 'border-orange-700/50' },
+    cyan: { bg: 'bg-cyan-900/30', text: 'text-cyan-400', border: 'border-cyan-700/50' },
+    pink: { bg: 'bg-pink-900/30', text: 'text-pink-400', border: 'border-pink-700/50' },
+    lime: { bg: 'bg-lime-900/30', text: 'text-lime-400', border: 'border-lime-700/50' },
+    violet: { bg: 'bg-violet-900/30', text: 'text-violet-400', border: 'border-violet-700/50' },
+    fuchsia: { bg: 'bg-fuchsia-900/30', text: 'text-fuchsia-400', border: 'border-fuchsia-700/50' },
+    sky: { bg: 'bg-sky-900/30', text: 'text-sky-400', border: 'border-sky-700/50' },
+    red: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/50' },
+    green: { bg: 'bg-green-900/30', text: 'text-green-400', border: 'border-green-700/50' },
+    yellow: { bg: 'bg-yellow-900/30', text: 'text-yellow-400', border: 'border-yellow-700/50' },
+    slate: { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' },
   };
 
   const styles = colorStyles[color];
@@ -145,13 +145,13 @@ function SectionCard({
         className="p-6 cursor-pointer"
       >
         <div className="flex items-center gap-4">
-          <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${styles.text} bg-white shadow-sm`}>
+          <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${styles.text} bg-[#1a1a2e] shadow-sm border border-[#2a2a45]`}>
             <Icon className="h-7 w-7" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className={`text-lg font-semibold ${styles.text}`}>{title}</h3>
             {count !== undefined && (
-              <p className="text-3xl font-bold text-gray-900">{count}</p>
+              <p className="text-3xl font-bold text-white">{count}</p>
             )}
           </div>
           {items.length > 1 && (
@@ -162,12 +162,12 @@ function SectionCard({
 
       {/* Expandable Items */}
       {isExpanded && items.length > 1 && (
-        <div className="border-t border-white/50 bg-white/50">
+        <div className="border-t border-[#2a2a45] bg-[#151525]">
           {items.map((item, index) => (
             <div
               key={index}
               onClick={() => router.push(item.href)}
-              className="px-4 py-2.5 text-sm text-gray-700 hover:bg-white cursor-pointer flex items-center gap-2 border-b border-gray-100 last:border-b-0"
+              className="px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1a1a2e] cursor-pointer flex items-center gap-2 border-b border-[#2a2a45] last:border-b-0"
             >
               <span className={`w-1.5 h-1.5 rounded-full ${styles.text.replace('text-', 'bg-')}`} />
               {item.title}
@@ -320,19 +320,20 @@ export default function DashboardPage() {
             animation: fadeOut 0.5s ease-out forwards;
           }
         `}</style>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-indigo-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f0f1a]">
           <div className={splashPhase === 'fadeout' ? 'splash-fadeout' : 'splash-bounce'}>
             <div className="flex flex-col items-center gap-4">
-              <NextImage
-                src="/logo.svg"
-                alt="FilmGrid Logo"
-                width={80}
-                height={80}
-                className="rounded-2xl shadow-2xl"
-              />
+              <div className="bg-white p-4 rounded-2xl shadow-2xl">
+                <NextImage
+                  src="/logo.svg"
+                  alt="FilmGrid Logo"
+                  width={64}
+                  height={64}
+                />
+              </div>
               <div className="text-center">
-                <h1 className="text-3xl font-bold text-gray-900">FilmGrid</h1>
-                <p className="text-sm text-gray-500 mt-1">Admin Dashboard</p>
+                <h1 className="text-3xl font-bold text-white">FilmGrid</h1>
+                <p className="text-sm text-gray-400 mt-1">Admin Dashboard</p>
               </div>
             </div>
           </div>
@@ -355,8 +356,8 @@ export default function DashboardPage() {
         animation: cardsVisible ? 'fadeInUp 0.6s ease-out forwards' : 'none',
         opacity: 0,
       }}>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}!</h1>
-        <p className="text-sm text-gray-500">FilmGrid Admin Dashboard</p>
+        <h1 className="text-2xl font-bold text-white">{greeting}!</h1>
+        <p className="text-sm text-gray-400">FilmGrid Admin Dashboard</p>
       </div>
 
       {/* Section Cards Grid */}
@@ -371,7 +372,7 @@ export default function DashboardPage() {
           <SectionCard key="influencers" title="Influencers" icon={Instagram} color="pink" count={stats?.influencers || 0}
             items={[{ title: 'Influencers', href: '/dashboard/influencers' }, { title: 'Promotions', href: '/dashboard/promotions' }]} />,
           <SectionCard key="banners" title="Banners" icon={Image} color="emerald"
-            items={[{ title: 'Manage Banners', href: '/dashboard/banners' }]} />,
+            items={[{ title: 'Hero Banners', href: '/dashboard/banners' }, { title: 'Equipment Banners', href: '/dashboard/banners/equipment' }, { title: 'Crew Banners', href: '/dashboard/banners/crew' }, { title: 'Popup Banner', href: '/dashboard/popup-banner' }]} />,
           <SectionCard key="locations" title="Lease Locations" icon={MapPin} color="green" count={stats?.locations || 0}
             items={[{ title: 'All Locations', href: '/dashboard/locations' }]} />,
           <SectionCard key="competitions" title="Competitions" icon={Trophy} color="yellow"
