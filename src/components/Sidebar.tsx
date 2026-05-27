@@ -97,6 +97,7 @@ const bannerSubItems = [
   { href: '/dashboard/banners/equipment', label: 'Equipment Banners' },
   { href: '/dashboard/banners/crew', label: 'Crew Banners' },
   { href: '/dashboard/popup-banner', label: 'Popup Banner' },
+  { href: '/dashboard/promo-overlay', label: 'Promo Overlay' },
 ];
 
 const otherNavItems = [
